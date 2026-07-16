@@ -1,0 +1,607 @@
+﻿:root {
+  /* 天鳳に寄せた濃い緑基調 */
+  --bg: #06120d;
+  --felt: #135437;
+  --felt-dark: #07281a;
+  --wood: #2b1a10;
+  --text: #eaf3ef;
+  --muted: #8fa89d;
+  --hot: #c8452f;
+  --gold: #e0bb63;
+  --panel: #0d1a14;
+  --line: #24382d;
+
+  /*
+   * 卓の大きさ。牌はここから逆算するので、どの画面でも手牌がはみ出さない。
+   * 手牌は最大14枚 + ツモ牌の間隔なので、実質14.6枚ぶんの幅が要る。
+   */
+  --table: min(760px, 96vw, calc(100vh - 130px));
+  --tw: min(46px, calc((var(--table) - 30px) / 14.6));
+  /* 牌画像は 66x90 なので、その比率に合わせる */
+  --th: calc(var(--tw) * 1.364);
+  /* 河は6列 + 列間5つの隙間が河1マス(卓の21.3%)に収まる必要がある。
+     隙間を勘定に入れないと両端の牌がマスからはみ出す。 */
+  --tw-sm: min(26px, calc(var(--table) / 29.5));
+  --th-sm: calc(var(--tw-sm) * 1.364);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+  font-size: 14px;
+}
+
+.app { max-width: 1000px; margin: 0 auto; padding: 14px; }
+
+header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+h1 { font-size: 20px; margin: 0 0 10px; letter-spacing: 0.06em; }
+h1 .sub { font-size: 12px; font-weight: normal; color: var(--muted); margin-left: 8px; }
+
+button, select, input {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 5px 11px;
+  font: inherit;
+  cursor: pointer;
+}
+button:hover { border-color: var(--gold); }
+button.hot { background: var(--hot); border-color: var(--hot); font-weight: bold; }
+button.on { background: var(--gold); color: #1a1a1a; border-color: var(--gold); font-weight: bold; }
+input { cursor: text; }
+
+.tabs { display: flex; gap: 4px; }
+.tab { border-radius: 4px 4px 0 0; }
+
+/* ================= 牌 ================= */
+
+.tile {
+  position: relative;
+  display: inline-block;
+  width: var(--tw);
+  height: var(--th);
+  vertical-align: bottom;
+  flex: none;
+}
+.tile.is-sm { width: var(--tw-sm); height: var(--th-sm); }
+/* 90/270度回転した牌は外形の縦横が入れ替わる */
+.tile.is-swap { width: var(--th); height: var(--tw); }
+.tile.is-sm.is-swap { width: var(--th-sm); height: var(--tw-sm); }
+
+.tile-inner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--tw);
+  height: var(--th);
+  transform-origin: center;
+}
+.tile.is-sm .tile-inner { width: var(--tw-sm); height: var(--th-sm); }
+
+.tile-front, .tile-back {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 12%/9%;
+  position: relative;
+}
+
+/*
+ * 牌の表は画像 (麻雀豆腐の素材)。画像自体が牌面と枠を持っているので、
+ * こちらでは影を落とすだけにして、余計な装飾を重ねない。
+ */
+.tile-front {
+  object-fit: fill;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.5));
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/*
+ * 牌の裏。背の色は設定で選べる (.back-* を app に付ける)。
+ * 既定は緑。--back-hi/--back-mid/--back-lo で3段階の階調を作る。
+ */
+.tile-back {
+  background: linear-gradient(163deg, var(--back-hi) 0%, var(--back-mid) 55%, var(--back-lo) 100%);
+  border: 1px solid var(--back-edge);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -3px 5px rgba(0, 0, 0, 0.35),
+    0 2px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* 薄めの緑 */
+.back-green { --back-hi: #6fc496; --back-mid: #46a274; --back-lo: #2f7c55; --back-edge: #236243; }
+/* 青 */
+.back-blue { --back-hi: #5a92d8; --back-mid: #3467ad; --back-lo: #22477d; --back-edge: #17335c; }
+/* 濃い紫 */
+.back-purple { --back-hi: #7a4fa8; --back-mid: #55307a; --back-lo: #3a1f57; --back-edge: #29143d; }
+/* ベージュ寄りの黄 */
+.back-yellow { --back-hi: #e8d29a; --back-mid: #cfae65; --back-lo: #a88742; --back-edge: #7d6430; }
+/* 黒 (背が黒い牌) */
+.back-black { --back-hi: #4a4a4f; --back-mid: #2b2b30; --back-lo: #17171a; --back-edge: #0c0c0e; }
+
+/* リーチ宣言に使えない牌は、押しても何も起きないので明確に沈める */
+.tile.is-dim .tile-inner { opacity: 0.22; filter: grayscale(0.7); }
+.tile.is-sel { cursor: pointer; }
+.tile.is-sel:hover { z-index: 3; }
+.tile.is-sel:hover .tile-inner { filter: brightness(1.06); box-shadow: 0 0 0 2px var(--gold); border-radius: 4px; }
+
+/*
+ * リーチ宣言牌の候補。リーチは「押してから宣言牌を選ぶ」2段階なので、
+ * どれを押せばいいのかが一目で分からないと「リーチできない」ように見える。
+ */
+.tile.is-pick { z-index: 4; }
+.tile.is-pick .tile-inner {
+  box-shadow: 0 0 0 3px var(--gold), 0 0 18px 4px rgba(224, 187, 99, 0.85);
+  border-radius: 5px;
+  animation: pick-pulse 0.9s ease-in-out infinite alternate;
+}
+.side-bottom .tile.is-pick { transform: translateY(-10px); }
+@keyframes pick-pulse {
+  from { box-shadow: 0 0 0 3px var(--gold), 0 0 10px 2px rgba(224, 187, 99, 0.6); }
+  to { box-shadow: 0 0 0 3px var(--gold), 0 0 22px 7px rgba(224, 187, 99, 0.95); }
+}
+/*
+ * ツモ牌の枠。牌が無いときも場所を確保して、ツモのたびに手牌が動かないようにする。
+ * 理牌された本体とは離して置き、別枠であることを見て分かるようにする。
+ */
+.tsumo-slot { flex: none; display: block; position: relative; }
+.side-bottom .tsumo-slot, .side-top .tsumo-slot { width: var(--tw); height: var(--th); margin-left: 16px; }
+.side-bottom .tsumo-slot:not(.big), .side-top .tsumo-slot:not(.big) { width: var(--tw-sm); height: var(--th-sm); }
+/* 左右の席は牌が横倒しなので、縦横を入れ替えて確保する */
+.side-left .tsumo-slot, .side-right .tsumo-slot { width: var(--th-sm); height: var(--tw-sm); margin-top: 16px; }
+
+.side-bottom .tsumo-slot::after {
+  content: 'ツモ';
+  position: absolute;
+  left: 50%;
+  bottom: -15px;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: var(--gold);
+  white-space: nowrap;
+  opacity: 0.9;
+}
+.side-bottom .tsumo-slot:empty::after { content: ''; }
+
+/* ================= 卓 ================= */
+
+.table-wrap { display: flex; justify-content: center; margin: 6px 0 10px; }
+
+.table {
+  position: relative;
+  /* 卓が画面からはみ出すと、卓上に置いた操作ボタンごと見えなくなる。
+     ヘッダーと牌譜のぶんを引いて、必ずビューポートに収まる大きさにする。 */
+  width: var(--table);
+  aspect-ratio: 1;
+  border-radius: 10px;
+  border: 6px solid var(--wood);
+  background: radial-gradient(ellipse at 50% 44%, var(--felt) 0%, var(--felt-dark) 82%);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.5),
+    inset 0 0 90px rgba(0, 0, 0, 0.5),
+    0 10px 30px rgba(0, 0, 0, 0.6);
+}
+
+/* --- 各席 --- */
+.side { position: absolute; display: flex; gap: 8px; }
+.side .rack { display: flex; align-items: center; gap: 10px; }
+
+.side-bottom { bottom: 6px; left: 50%; transform: translateX(-50%); flex-direction: column; align-items: center; }
+.side-top    { top: 6px; left: 50%; transform: translateX(-50%); flex-direction: column-reverse; align-items: center; }
+/*
+ * 左右の席は名札を手牌の「横」に置くと、卓が小さいとき河に被る
+ * ([名札][河][名札] が卓幅に収まらない)。名札は手牌の上に積む。
+ */
+.side-left   { left: 6px; top: 50%; transform: translateY(-50%); flex-direction: column; align-items: flex-start; }
+.side-right  { right: 6px; top: 50%; transform: translateY(-50%); flex-direction: column; align-items: flex-end; }
+
+/* 左右の席は手牌を縦に積む */
+.side-left .rack, .side-right .rack { flex-direction: column; }
+.side-bottom .hand, .side-top .hand { display: flex; align-items: flex-end; }
+.side-left .hand, .side-right .hand { display: flex; flex-direction: column; }
+.side-left .tile.is-drawn, .side-right .tile.is-drawn { margin-left: 0; margin-top: 12px; }
+
+.melds { display: flex; gap: 6px; }
+.side-left .melds, .side-right .melds { flex-direction: column; }
+.meld { display: flex; }
+.side-left .meld, .side-right .meld { flex-direction: column; }
+
+/* --- 名札 --- */
+.plate {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  background: rgba(0, 0, 0, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+  height: fit-content;
+}
+.side.active .plate { border-color: var(--gold); box-shadow: 0 0 8px rgba(224, 187, 99, 0.5); }
+.plate .pt { color: var(--gold); }
+.plate .chips { color: var(--muted); }
+.plate .chips::before { content: '🪙'; margin-right: 2px; }
+
+.badge { background: rgba(255, 255, 255, 0.16); border-radius: 3px; padding: 1px 4px; font-size: 10px; }
+.badge.dealer { background: var(--gold); color: #1a1a1a; font-weight: bold; }
+.badge.riichi { background: var(--hot); }
+
+/* --- 捨て牌 (河) --- */
+.pond {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 64%;
+  aspect-ratio: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr 1fr;
+}
+.pc-top { grid-area: 1 / 2; }
+.pc-left { grid-area: 2 / 1; }
+.pond-center { grid-area: 2 / 2; }
+.pc-right { grid-area: 2 / 3; }
+.pc-bottom { grid-area: 3 / 2; }
+
+/* セルは正方形なので、中身を回してもセルからはみ出さない */
+.pond-inner { width: 100%; height: 100%; }
+.pc-top .pond-inner { transform: rotate(180deg); }
+.pc-left .pond-inner { transform: rotate(90deg); }
+.pc-right .pond-inner { transform: rotate(-90deg); }
+
+.discards {
+  display: grid;
+  grid-template-columns: repeat(6, var(--tw-sm));
+  justify-content: center;
+  align-content: start;
+  gap: 1px;
+}
+/* リーチ宣言牌は横に倒れるぶん、置き場所も広げる */
+.discards .tile.is-swap { grid-column: span 2; justify-self: start; }
+
+.pond-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  font-size: 10px;
+  /* ドラを手牌と同じ大きさで出すため、中央マスからは少しはみ出してよい */
+  overflow: visible;
+  z-index: 2;
+}
+/* 王牌の表示。嶺上4枚 + ドラ表示2枚 の計6枚を中央に置く。 */
+.dead-wall { display: flex; gap: 2px; align-items: center; justify-content: center; }
+.rinshan-gap { width: var(--tw); height: var(--th); flex: none; }
+.dw-labels {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  font-size: 9px;
+  color: var(--muted);
+}
+.dw-labels .gold { color: var(--gold); }
+
+.dora-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-bottom: 8px;
+  font-size: 11px;
+}
+.dora-row .cap { color: var(--muted); }
+.dora-row .cap.ura { color: var(--gold); margin-left: 10px; }
+.wall-count { display: flex; align-items: baseline; gap: 3px; color: var(--muted); }
+.wall-count b { font-size: 19px; color: var(--text); }
+.kan-count { color: var(--muted); }
+
+/* ================= 操作 ================= */
+
+/* 卓の上、自分の手牌のすぐ上に重ねる */
+.actions {
+  position: absolute;
+  right: 14px;
+  bottom: 88px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 60%;
+  z-index: 5;
+}
+/* 鳴き・和了のボタンは打牌より重い判断なので、明確に大きく目立たせる */
+.actions button {
+  min-width: 104px;
+  padding: 17px 26px;
+  font-size: 21px;
+  font-weight: bold;
+  letter-spacing: 0.14em;
+  border-radius: 7px;
+  background: linear-gradient(#33465c, #1e2c3d);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.5), 0 5px 14px rgba(0, 0, 0, 0.5);
+}
+.actions button:hover { filter: brightness(1.18); }
+.actions button:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5); }
+/* ロン・ツモ = 赤、ポン/カン = 青、パス = 地味に */
+.actions button.hot { background: linear-gradient(#e0563c, #a8351f); border-color: #ffab95; }
+.actions button.call { background: linear-gradient(#3f7fbf, #245287); border-color: #8fc4f0; }
+.actions button.pass { min-width: 78px; font-size: 17px; padding: 15px 18px; background: linear-gradient(#3a463f, #232c27); }
+.actions button.on { background: linear-gradient(#f0cd77, #d4a63f); color: #1a1a1a; border-color: #fff0c4; }
+/* リーチ宣言待ちの案内。手牌のすぐ上に横帯で出す。 */
+.riichi-guide {
+  position: absolute;
+  left: 50%;
+  bottom: 96px;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  white-space: nowrap;
+  padding: 8px 14px;
+  font-size: 14px;
+  color: #1a1a1a;
+  background: linear-gradient(#f7d98c, #e0bb63);
+  border-radius: 6px;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.6);
+}
+.riichi-guide b { font-size: 17px; letter-spacing: 0.1em; }
+.riichi-guide button {
+  padding: 4px 10px;
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  border-color: rgba(0, 0, 0, 0.4);
+}
+
+/* 常用の設定は卓の左下に縦に並べる (卓の上には重ねない) */
+.opt-rail {
+  position: absolute;
+  left: 0;
+  bottom: 44px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  z-index: 5;
+}
+.opt-rail .toggle {
+  min-width: 118px;
+  text-align: left;
+  padding: 7px 11px;
+  font-size: 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+.opt-rail .toggle.on {
+  background: linear-gradient(#f0cd77, #d4a63f);
+  color: #1a1a1a;
+  border-color: #fff0c4;
+  font-weight: bold;
+}
+.opt-rail .toggle.on::before { content: '✓ '; }
+/* 卓を画面中央に保ったまま、左脇の余白にレールを置く */
+.app { position: relative; }
+@media (max-width: 1000px) {
+  .opt-rail { position: static; flex-direction: row; margin-bottom: 6px; }
+}
+
+/* ================= 掛け声の演出 ================= */
+
+.call-effect {
+  position: absolute;
+  z-index: 20;
+  pointer-events: none;
+  font-size: 46px;
+  font-weight: bold;
+  letter-spacing: 0.16em;
+  color: #fff;
+  text-shadow: 0 0 18px rgba(0, 0, 0, 0.9), 0 3px 8px rgba(0, 0, 0, 0.8);
+  padding: 6px 20px;
+  border-radius: 8px;
+  animation: pop 0.26s cubic-bezier(0.2, 1.7, 0.5, 1);
+}
+.call-effect span { display: block; }
+.ef-bottom { bottom: 150px; left: 50%; transform: translateX(-50%); }
+.ef-top    { top: 120px; left: 50%; transform: translateX(-50%); }
+.ef-left   { left: 90px; top: 50%; transform: translateY(-50%); }
+.ef-right  { right: 90px; top: 50%; transform: translateY(-50%); }
+
+.ef-pon, .ef-kan { color: #8fd0ff; }
+.ef-riichi { color: #ffd970; }
+.ef-ron, .ef-tsumo { color: #ff8b6e; font-size: 58px; }
+
+@keyframes pop {
+  from { opacity: 0; scale: 0.5; }
+  to { opacity: 1; scale: 1; }
+}
+
+/* 結果も卓の中央に重ねる (下に置くと画面外に出て「次の局へ」に気づけない) */
+.result {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(470px, 86%);
+  padding: 14px 16px;
+  background: rgba(11, 28, 22, 0.97);
+  border: 1px solid var(--gold);
+  border-radius: 8px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.65);
+  z-index: 10;
+}
+/* --- アガリ表示 (天鳳の点数表示に倣う) --- */
+
+/* 天鳳の「30符3飜 1000-2000点」にあたる大見出し */
+.headline {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 12px;
+  margin: 14px 0 10px;
+}
+.headline .who { font-size: 15px; color: var(--text); }
+.headline .how {
+  font-size: 26px;
+  font-weight: bold;
+  letter-spacing: 0.1em;
+  color: #ff8b6e;
+}
+.headline .pts {
+  font-size: 30px;
+  font-weight: bold;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+.headline .pts em {
+  display: block;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: normal;
+  color: var(--muted);
+  text-align: right;
+  letter-spacing: 0;
+}
+.headline.draw { font-size: 26px; font-weight: bold; color: var(--gold); }
+
+/* 天鳳の役一覧の位置。2列で並べる。 */
+.parts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 18px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 5px;
+  font-size: 13px;
+}
+.parts .p { display: flex; justify-content: space-between; gap: 12px; }
+.parts .p .k { color: var(--text); }
+.parts .p .k em { font-style: normal; color: var(--gold); margin-left: 3px; }
+.parts .p .v { color: var(--muted); font-variant-numeric: tabular-nums; }
+.result .capped { color: var(--hot); font-size: 11px; text-align: center; margin-bottom: 6px; }
+
+/* 天鳳の「25000 -1000」。持ち点と増減を並べる。 */
+.ledger {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.ledger td { padding: 5px 6px; border-top: 1px solid rgba(255, 255, 255, 0.08); }
+.ledger .seat { color: var(--muted); white-space: nowrap; }
+.ledger .seat .badge { margin-left: 5px; }
+.ledger .score, .ledger .chip { text-align: right; color: var(--text); }
+.ledger .chip { color: var(--muted); font-size: 12px; }
+.ledger .delta, .ledger .cdelta { text-align: right; font-weight: bold; width: 62px; }
+.ledger .cdelta { font-size: 11px; font-weight: normal; width: 66px; }
+.ledger .plus .delta, .ledger .plus .cdelta { color: var(--gold); }
+.ledger .minus .delta, .ledger .minus .cdelta { color: #e69384; }
+
+/* 何で和了ったかが一目で分かるよう、和了形をそのまま出す */
+.win-hand {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 6px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+}
+.win-hand .concealed, .win-hand .meld { display: flex; }
+.win-hand .agari-tile { margin-left: 10px; position: relative; }
+.win-hand .agari-tile::after {
+  content: 'アガリ牌';
+  position: absolute;
+  left: 50%;
+  bottom: -13px;
+  transform: translateX(-50%);
+  font-size: 9px;
+  color: var(--gold);
+  white-space: nowrap;
+}
+
+/* 「次の局へ」は迷わず押せるよう中央に大きく */
+.result .hot.big {
+  display: block;
+  margin: 4px auto 0;
+  min-width: 220px;
+  padding: 14px 28px;
+  font-size: 18px;
+  font-weight: bold;
+  letter-spacing: 0.12em;
+  border-radius: 7px;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.5), 0 5px 14px rgba(0, 0, 0, 0.5);
+}
+.result .hot.big:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5); }
+.broke { justify-content: center; text-align: center; }
+
+.rake { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.rake b { color: var(--text); }
+.rake .cum { margin-left: 6px; opacity: 0.7; }
+.broke { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--hot); }
+
+.log { margin-top: 10px; color: var(--muted); font-size: 12px; }
+.log summary { cursor: pointer; }
+.log ol { max-height: 150px; overflow-y: auto; }
+
+/* ================= ルール / 設定 ================= */
+
+.rules-panel, .settings {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 16px 18px;
+  line-height: 1.7;
+}
+.rules-panel h3, .settings h3 { font-size: 13px; color: var(--gold); margin: 18px 0 6px; letter-spacing: 0.08em; }
+.rules-panel h3:first-of-type { margin-top: 8px; }
+.rules-panel .lead { margin: 0 0 4px; }
+.rules-panel table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.rules-panel th {
+  text-align: left;
+  font-weight: normal;
+  color: var(--muted);
+  width: 130px;
+  padding: 4px 10px 4px 0;
+  vertical-align: top;
+  white-space: nowrap;
+}
+.rules-panel td { padding: 4px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+.rules-panel .note, .settings .note { font-size: 12px; color: var(--muted); margin: 6px 0; }
+.rules-panel .quote { display: block; margin: 4px 0; padding-left: 10px; border-left: 2px solid var(--line); color: var(--muted); }
+.rules-panel .src { font-size: 12px; margin-top: 16px; }
+.rules-panel a { color: var(--gold); }
+.warn { color: var(--hot); }
+
+.settings .seg { display: flex; gap: 6px; flex-wrap: wrap; }
+/* 背の色の見本つきボタン */
+.settings .back-pick { display: flex; align-items: center; gap: 6px; }
+.settings .back-pick .swatch {
+  width: 14px;
+  height: 19px;
+  border-radius: 3px;
+  border: 1px solid var(--back-edge);
+  background: linear-gradient(163deg, var(--back-hi) 0%, var(--back-mid) 55%, var(--back-lo) 100%);
+}
+.settings .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin: 8px 0; }
+.settings .fields label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
+.settings .apply { margin-top: 20px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* 牌の大きさは --table から算出しているので、狭い画面でも自動で縮む。 */

@@ -1,0 +1,17 @@
+node_modules/
+dist/
+dist-ssr/
+
+# 牌画像の配布元アーカイブ。使う画像は public/tiles/ に取り込み済みなので不要。
+img/
+# 動作確認のために保存したページのスナップショットや参考画像。
+sample/
+
+*.local
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
