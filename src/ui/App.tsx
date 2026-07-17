@@ -310,23 +310,34 @@ export const App = () => {
         <>
           <div className="table-wrap">
             <div className={`table seats-${game.seatCount}`}>
-              {/* タブは卓の右上に置く。開いている間は「閉じる」で戻す。 */}
+              {/*
+                タブは卓の右上に置く。パネルを開いている間は「閉じる」だけを出す。
+                開いた先で他のタブを並べても、パネルに隠れて押せないため。
+              */}
               <nav className="tabs">
-                {supportsFullscreen() && (
-                  <button className="tab" onClick={() => void toggleFullscreen()}>
-                    {fs ? '⤢' : '⛶'}
+                {tab !== 'table' ? (
+                  <button className="tab on" onClick={() => setTab('table')}>
+                    閉じる
                   </button>
+                ) : (
+                  <>
+                    {supportsFullscreen() && (
+                      <button className="tab" onClick={() => void toggleFullscreen()}>
+                        {fs ? '⤢' : '⛶'}
+                      </button>
+                    )}
+                    {(['rules', 'settings'] as const).map((t) => (
+                      <button
+                        key={t}
+                        className="tab"
+                        onClick={() => setTab(t)}
+                        aria-label={t === 'rules' ? 'ルール' : '設定'}
+                      >
+                        {t === 'rules' ? 'ルール' : '⚙'}
+                      </button>
+                    ))}
+                  </>
                 )}
-                {(['rules', 'settings'] as const).map((t) => (
-                  <button
-                    key={t}
-                    className={tab === t ? 'tab on' : 'tab'}
-                    onClick={() => setTab(tab === t ? 'table' : t)}
-                    aria-label={t === 'rules' ? 'ルール' : '設定'}
-                  >
-                    {tab === t ? '閉じる' : t === 'rules' ? 'ルール' : '⚙'}
-                  </button>
-                ))}
               </nav>
 
               {game.players.map((p, i) => (
@@ -879,12 +890,18 @@ const Result = ({
               {seatName(i, game.seatCount, game.dealer)}
               {game.dealer === i && <span className="badge dealer">親</span>}
             </span>
-            <span className="p">{d === 0 ? '±0' : `${fmt(d)}点`}</span>
-            {stakes.rate > 0 && (
+            {/*
+              席ごとの表示はWだけにする。点は上の見出しと下の内訳に出ているので、
+              ここに並べても同じ数字が3か所に散るだけで読みにくい。
+              (レートを0にするとWが動かないので、そのときだけ点に戻す)
+            */}
+            {stakes.rate > 0 ? (
               <span className="c">
                 {formatChips(chips[i])}W
-                {d !== 0 && <em>{fmt(chipDeltas[i])}</em>}
+                {d !== 0 && <em>{fmt(chipDeltas[i])}W</em>}
               </span>
+            ) : (
+              <span className="p">{d === 0 ? '±0' : `${fmt(d)}点`}</span>
             )}
           </div>
         ))}

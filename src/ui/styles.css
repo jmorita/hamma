@@ -36,7 +36,10 @@
   --table-h: min(
     760px,
     calc(var(--vh) - var(--chrome)),
-    calc(var(--table-w) - 100px + var(--seat-band) + var(--top-band))
+    calc(
+      (var(--table-w) - 100px) / var(--pond-w-span) * var(--pond-h-span) + var(--seat-band) +
+        var(--top-band)
+    )
   );
 
   /* 卓の枠の太さ。狭い画面では牌に幅を回したいので細くする。 */
@@ -58,55 +61,61 @@
   --seat-band: calc(var(--th) + 10px);
   /* 奥の席の帯。小さい牌しか置かず、名札も隅に逃がしたので狭くて足りる。 */
   --top-band: 46px;
-  /* 河は上下の帯に挟まれた正方形。 */
-  --pond: max(
-    84px,
-    min(calc(var(--table-h) - var(--seat-band) - var(--top-band)), calc(var(--table-w) - 100px))
-  );
-
   /*
-   * 河の並び。1行 --kawa-cols 枚 × --kawa-rows 段。
+   * 河の並び。上下の河 (横に伸びる) と左右の河 (縦に伸びる) で形を分ける。
    *
-   * 段数は「1人あたりの最大捨牌数」から決まる (足りないと河が枠から溢れる)。
+   * 容量は「1人あたりの最大捨牌数」から決まる (足りないと河が枠から溢れる)。
    * 王牌8枚 (嶺上4 + 表示4) を除いた 128枚 - 配牌13n を n 人で割ると、
-   * 4人打ちは最大19枚 + リーチ宣言牌の横向きぶん1 = 20スロット。
+   * 4人打ちは最大19枚 + リーチ宣言牌の横向きぶん1 = 20スロット。列×段 >= 20 が要る。
    *
-   * 慣習の6枚切りだと 20/6 = 4段 必要になり、深さが上下から高さを食って牌が縮む。
-   * 7列にすると 20/7 = 3段 で収まり、同じ河でも牌を約12%大きくできる:
-   *   6列4段 -> 16.0px / 7列3段 -> 17.8px / 8列3段 -> 16.7px (縦向き実測ベース)
+   * 上下と左右を同じ形にすると河は正方形にしかならず (下の --pond-*-span 参照)、
+   * 短い辺に引きずられて牌が縮む。画面の余っている向きへ河を伸ばすため、
+   * 上下は浅く広く、左右は狭く深くする。6枚切りの慣習より牌の大きさを優先している。
    */
-  --kawa-cols: 7;
-  --kawa-rows: 3;
+  --kawa-cols-h: 7;
+  --kawa-rows-h: 3;
+  --kawa-cols-v: 7;
+  --kawa-rows-v: 3;
   /*
-   * 河が要する一辺を「牌の幅」を1として数える。
-   *   一辺 = 上下(または左右)の河の深さ × 2 + 中央の枠
-   *   河の深さ = 段数 × 1.364 (牌の縦横比) / 中央の枠 = 河の幅 = 列数
-   * 左右の河は90度回すので、中央の枠は縦にも河の幅ぶん要る。
-   * → 河の縦と横の必要量は必ず一致する = 河は正方形にしかならない。
+   * 河が要する縦横を「牌の幅」を1として数える。
+   *   幅 = 左右の河の深さ × 2 + 中央の枠の幅 (= 上下の河の列数)
+   *   高さ = 上下の河の深さ × 2 + 中央の枠の高さ (= 左右の河の列数。90度回すので)
+   * 上下と左右が同じ形なら幅と高さの必要量は一致する = 正方形にしかならない。
+   * 形を分けて初めて長方形にできる。
    */
-  --pond-span: calc(2 * var(--kawa-rows) * 1.364 + var(--kawa-cols));
+  --pond-w-span: calc(2 * var(--kawa-rows-v) * 1.364 + var(--kawa-cols-h));
+  --pond-h-span: calc(2 * var(--kawa-rows-h) * 1.364 + var(--kawa-cols-v));
   /* 牌と牌の1pxの隙間ぶん。これを引かないと1列/1段ぶん溢れる。 */
-  --pond-gaps: calc(2 * var(--kawa-rows) * 1px + var(--kawa-cols) * 1px + 6px);
+  --pond-w-gaps: calc(2 * var(--kawa-rows-v) * 1px + var(--kawa-cols-h) * 1px + 6px);
+  --pond-h-gaps: calc(2 * var(--kawa-rows-h) * 1px + var(--kawa-cols-v) * 1px + 6px);
+  /* 河に使える範囲。幅は左右の席の手牌のぶんを空ける。 */
+  --pond-w-avail: calc(var(--table-w) - 100px);
+  --pond-h-avail: calc(var(--table-h) - var(--seat-band) - var(--top-band));
   /*
-   * 河と他家の牌。上限は「河が --pond に収まること」と
-   * 「左右の席の手牌13枚が卓の高さに収まること」の両方から決まる。
+   * 河と他家の牌。上限は「河が卓に収まること」と
+   * 「左右の席の手牌14枚 (13 + ツモ) が卓の高さに収まること」の両方から決まる。
    * 手牌(--tw)は超えないようにする。
-   * ※ 以前は「1マス = 河の1/3 の正方形」を前提に (pond/3 - 6)/6 としていたが、
-   *   河は段数ぶんの深さしか使わないので、マスの3割強が死に余白になっていた。
+   * ※ 左右の手牌は90度倒してあるので、1枚が縦に占めるのは牌の「幅」。
+   *   以前はここを高さと取り違えて 1.364 で割っており、2割ぶん無駄に縮めていた。
    */
   --tw-sm: max(
     7px,
     min(
       var(--tw),
-      calc((var(--pond) - var(--pond-gaps)) / var(--pond-span)),
-      calc((var(--table-h) - 60px) / 13 / 1.364)
+      calc((var(--pond-w-avail) - var(--pond-w-gaps)) / var(--pond-w-span)),
+      calc((var(--pond-h-avail) - var(--pond-h-gaps)) / var(--pond-h-span)),
+      calc((var(--table-h) - 76px) / 14)
     )
   );
   --th-sm: calc(var(--tw-sm) * 1.364);
   /* 河の深さ (段数ぶん)。マスの一辺ではなくこれだけ確保すればよい。 */
-  --kawa-depth: calc(var(--kawa-rows) * (var(--th-sm) + 1px));
-  /* 中央の枠 = 河の一辺から上下の深さを引いた残り。 */
-  --pond-center: calc(var(--pond) - 2 * var(--kawa-depth));
+  --kawa-depth-h: calc(var(--kawa-rows-h) * (var(--th-sm) + 1px));
+  --kawa-depth-v: calc(var(--kawa-rows-v) * (var(--th-sm) + 1px));
+  /* 中央の枠。上下の河の幅ぶん / 左右の河の長さぶん。 */
+  --pond-center: calc(var(--kawa-cols-h) * (var(--tw-sm) + 1px));
+  --pond-center-h: calc(var(--kawa-cols-v) * (var(--tw-sm) + 1px));
+  --pond-w: calc(2 * var(--kawa-depth-v) + var(--pond-center));
+  --pond-h: calc(2 * var(--kawa-depth-h) + var(--pond-center-h));
   /* 王牌は河・他家の手牌と同じ大きさ。中央枠に4枚 + 隙間 + 余白が収まらなければ縮める。 */
   --tw-dw: min(var(--tw-sm), calc((var(--pond-center) - 26px) / 4));
   --th-dw: calc(var(--tw-dw) * 1.364);
@@ -471,8 +480,13 @@ input { cursor: text; }
  * 縦の余白は狭い (縦向きでは河の下端と設定の間が40px強しかない) ので、
  * 数値を動かすと河か設定のどちらかに触れる。
  */
-.side-bottom .plate { position: absolute; left: calc(var(--th-sm) + 14px); bottom: calc(var(--th) + 32px); }
-.side-top .plate    { position: absolute; right: calc(var(--th-sm) + 14px); top: calc(var(--th-sm) + 50px); }
+/*
+ * 左右は「手牌 + 右家/左家の名札」で埋まっているので、その内側へ寄せる。
+ * 100px は名札の実幅 (「南家 20,000W」で約90px) + 余白。ここを詰めると
+ * 対面の名札が右家の名札と重なる。
+ */
+.side-bottom .plate { position: absolute; left: calc(var(--th-sm) + 100px); bottom: calc(var(--th) + 32px); }
+.side-top .plate    { position: absolute; right: calc(var(--th-sm) + 100px); top: calc(var(--th-sm) + 50px); }
 /*
  * 左右の席は名札を手牌の「横」に置くと、卓が小さいとき河に被る
  * ([名札][河][名札] が卓幅に収まらない)。名札は手牌の上に積む。
@@ -557,21 +571,25 @@ input { cursor: text; }
    * 外周のマスは「河の深さ」だけ確保する。1/3 ずつの正方形にすると、
    * 河は段数ぶんしか使わないのでマスの3割強が死に余白になり、牌が小さくなる。
    */
-  width: var(--pond);
-  height: var(--pond);
+  width: var(--pond-w);
+  height: var(--pond-h);
   display: grid;
   /*
    * 中央は minmax(0, 1fr)。ただの 1fr だと最小サイズが中身(王牌+残り表示)の
    * min-content になり、中央が要求ぶんだけ広がって河ごと枠の外へ押し出される。
    */
-  grid-template-columns: var(--kawa-depth) minmax(0, 1fr) var(--kawa-depth);
-  grid-template-rows: var(--kawa-depth) minmax(0, 1fr) var(--kawa-depth);
+  grid-template-columns: var(--kawa-depth-v) minmax(0, 1fr) var(--kawa-depth-v);
+  grid-template-rows: var(--kawa-depth-h) minmax(0, 1fr) var(--kawa-depth-h);
 }
 /*
- * 3人打ちは1人あたりの捨牌が30枚と多い (4人打ちは19枚)。6列のままだと6段必要で
- * 河が深くなり牌が小さくなるので、列を増やして段を浅く保つ。
+ * 3人打ちは1人あたりの捨牌が30枚と多い (4人打ちは19枚)。列×段 >= 32 を確保する。
  */
-.seats-3 { --kawa-cols: 8; --kawa-rows: 4; }
+.seats-3 {
+  --kawa-cols-h: 8;
+  --kawa-rows-h: 4;
+  --kawa-cols-v: 8;
+  --kawa-rows-v: 4;
+}
 
 .pc-top { grid-area: 1 / 2; }
 .pc-left { grid-area: 2 / 1; }
@@ -588,8 +606,8 @@ input { cursor: text; }
  * 原点を左上に固定し、回転後にちょうどマスへ重なるよう平行移動する。
  */
 .pc-left .pond-inner, .pc-right .pond-inner {
-  width: var(--pond-center);
-  height: var(--kawa-depth);
+  width: var(--pond-center-h);
+  height: var(--kawa-depth-v);
   transform-origin: 0 0;
 }
 .pc-left .pond-inner { transform: rotate(90deg) translateY(-100%); }
@@ -868,8 +886,9 @@ input { cursor: text; }
   color: var(--gold);
   font-variant-numeric: tabular-nums;
 }
+/* 「放銃 ◯家」は点数の右へ横に並べる (下に置くと点数と縦に伸びて画面を食う)。 */
 .headline .pts em {
-  display: block;
+  margin-left: 8px;
   font-style: normal;
   font-size: 11px;
   font-weight: normal;
@@ -960,19 +979,10 @@ input { cursor: text; }
 .win-hand .tile { width: var(--tw-win); height: calc(var(--tw-win) * 1.364); }
 .win-hand .tile .tile-inner { width: var(--tw-win); height: calc(var(--tw-win) * 1.364); }
 .win-hand .tile.is-swap { width: calc(var(--tw-win) * 1.364); height: var(--tw-win); }
-.win-hand .agari-tile { margin-left: 10px; position: relative; }
-.win-hand .agari-tile::after {
-  content: 'アガリ牌';
-  position: absolute;
-  left: 50%;
-  bottom: -13px;
-  transform: translateX(-50%);
-  font-size: 9px;
-  color: var(--gold);
-  white-space: nowrap;
-}
+/* アガリ牌は手牌から離して右端に置く。離してあれば一目で分かるので、文字は添えない。 */
+.win-hand .agari-tile { margin-left: 10px; }
 
-/* 「次の局へ」は迷わず押せるよう中央に大きく */
+/* 「次の局へ」は迷わず押せるよう中央に大きく。白系にして結果の金色より前に出す。 */
 .result .hot.big {
   display: block;
   margin: 4px auto 0;
@@ -982,6 +992,9 @@ input { cursor: text; }
   font-weight: bold;
   letter-spacing: 0.12em;
   border-radius: 7px;
+  background: linear-gradient(#fff, #dfe3e1);
+  border: 1px solid #fff;
+  color: #1a1a1a;
   box-shadow: 0 3px 0 rgba(0, 0, 0, 0.5), 0 5px 14px rgba(0, 0, 0, 0.5);
 }
 .result .hot.big:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5); }
@@ -1061,6 +1074,39 @@ input { cursor: text; }
   header { min-height: 0; margin: 0; }
   header { margin-bottom: 4px; }
   h1 { font-size: 15px; margin: 0; }
+}
+
+/*
+ * スマホ縦向き。横向きとは逆に幅だけが足りず、高さは大きく余る。
+ * 河を余っている縦へ倒す:
+ *   左右の河 = 長く浅く (10列2段) → 左右から幅を食わない
+ *   上下の河 = 狭く深く (6列4段)   → 中央の枠の幅を食わない
+ * 正方形の7列3段だと幅290pxに縛られて18pxで頭打ちだが、この形なら24px近くまで伸びる。
+ * 卓は縦に伸びるが、余っていた高さを使うだけなので画面には収まる。
+ */
+@media (max-width: 760px) and (min-height: 541px) {
+  :root {
+    --kawa-cols-h: 6;
+    --kawa-rows-h: 4;
+    --kawa-cols-v: 10;
+    --kawa-rows-v: 2;
+    /*
+     * 対面の手牌 (14枚 = 約340px) と右上のタブ (約112px) は 390px の幅に
+     * 横並びできないので、対面はタブの下へ降ろす。奥の帯もそのぶん広げる。
+     * (帯 = 降ろした位置 40px + 牌の高さ + 余白。--th-sm から算出すると
+     *  --top-band -> --tw-sm -> --th-sm と循環するため実測値を直接置いている)
+     * 縦向きは高さが余っているので、卓が下へ伸びるだけで牌は縮まない。
+     */
+    --top-band: 78px;
+  }
+  .side-top { top: 40px; }
+  /* 3人打ちは1人30枚。左右をさらに伸ばして浅さを保つ。 */
+  .seats-3 {
+    --kawa-cols-h: 8;
+    --kawa-rows-h: 4;
+    --kawa-cols-v: 16;
+    --kawa-rows-v: 2;
+  }
   .tabs button { padding: 4px 8px; font-size: 12px; }
 
   /*
@@ -1107,7 +1153,17 @@ input { cursor: text; }
     /* ボタン類が卓の中に入ったので、卓の外はほぼ余白のみ。そのぶん卓に高さを回す。 */
     --chrome: calc(12px + env(safe-area-inset-bottom));
     --top-band: 32px;
-    /* 河の列数・段数は :root の 7列3段 のままで横向きも最大になる (専用の上書きは不要)。 */
+    /*
+     * 横向きは高さだけが足りず、幅は大きく余る。河を画面の余っている向きへ倒す:
+     *   上下の河 = 浅く広く (10列2段) → 上下から高さを食わない
+     *   左右の河 = 短く深く (6列4段)   → 中央の枠の高さを食わない
+     * 正方形かつ7列3段のままだと牌は18pxで頭打ちだが、この形なら高さの上限が
+     * 24px相当まで緩み、左右の席の手牌14枚ぶん (21.6px) まで牌を大きくできる。
+     */
+    --kawa-cols-h: 10;
+    --kawa-rows-h: 2;
+    --kawa-cols-v: 6;
+    --kawa-rows-v: 4;
     /* 手牌をやや譲って河と他家を大きくする (それでも縦向きより大きい) */
     --tw: min(
       32px,
@@ -1118,13 +1174,28 @@ input { cursor: text; }
       13px,
       min(
         26px,
-        calc((var(--pond) - var(--pond-gaps)) / var(--pond-span)),
-        calc((var(--table-h) - 60px) / 13 / 1.364)
+        calc((var(--pond-w-avail) - var(--pond-w-gaps)) / var(--pond-w-span)),
+        calc((var(--pond-h-avail) - var(--pond-h-gaps)) / var(--pond-h-span)),
+        calc((var(--table-h) - 76px) / 14)
       )
     );
   }
-  /* 3人打ちは捨牌が多い (31スロット)。8列でも4段要る。 */
-  .seats-3 { --kawa-cols: 8; --kawa-rows: 4; }
+  /* 3人打ちは捨牌が多い (31スロット)。上下は思い切り広くして2段に保つ。 */
+  .seats-3 {
+    --kawa-cols-h: 16;
+    --kawa-rows-h: 2;
+    --kawa-cols-v: 8;
+    --kawa-rows-v: 4;
+  }
+  /*
+   * 横向きは左右の席の名札を手牌の「横」に置く。
+   * 手牌の上に積むと、右家の名札が卓の右上に来て タブ と重なる
+   * (高さ378pxに対し 名札50 + 手牌308 = 358 でほぼ埋まり、下へ逃がす余地がない)。
+   * 横向きは河が469pxで卓844pxに対し左右に187pxずつ余るので、横に並べて逃がせる。
+   * (縦向きは20pxしか余らないので積んだまま)
+   */
+  .side-left { flex-direction: row-reverse; align-items: center; }
+  .side-right { flex-direction: row; align-items: center; }
   .actions button { padding: 8px 12px; font-size: 14px; min-width: 58px; }
   .actions button.pass { padding: 8px 10px; font-size: 13px; min-width: 48px; }
   .opt-menu > summary { padding: 4px 9px; font-size: 11px; }
