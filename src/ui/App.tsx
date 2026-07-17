@@ -54,6 +54,15 @@ export const App = () => {
   const [backSetting, setBackSetting] = useState<BackColorSetting>('random')
   const [back, setBack] = useState<BackColor>(() => pickBackColor('random'))
   const [fs, setFs] = useState(false)
+  /**
+   * タップ確認。1回目のタップで牌を持ち上げ、同じ牌をもう一度タップして初めて切る。
+   * 画面が小さい端末では牌が隣り合っていて誤打しやすいので、タッチ端末では既定でON。
+   */
+  const [confirmTap, setConfirmTap] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches,
+  )
+  /** 確認待ちの牌 (タップ確認がONのとき)。 */
+  const [pending, setPending] = useState<TileId | null>(null)
 
   // ESC等で全画面を抜けた場合もボタンの表示を合わせる
   useEffect(() => {
@@ -94,6 +103,12 @@ export const App = () => {
   }, [effect])
 
   useEffect(() => setSoundEnabled(sound), [sound])
+
+  // 手番や局が変わったら確認待ちを解除する。
+  // 残っていると次の手番の1タップ目でいきなり切れてしまう。
+  useEffect(() => {
+    if (game.turn !== HUMAN || game.phase !== 'discard') setPending(null)
+  }, [game.turn, game.phase, tick])
 
   // "jj" (j を素早く2回) でデバッグモードを切り替える。
   useEffect(() => {
@@ -242,10 +257,18 @@ export const App = () => {
   const onDiscard = (t: TileId) => {
     const withRiichi = riichiArmed && opts.riichiTiles.includes(t)
     if (riichiArmed && !withRiichi) return
+
+    // タップ確認: 1回目は持ち上げるだけ。同じ牌をもう一度タップで確定。
+    if (confirmTap && pending !== t) {
+      setPending(t)
+      return
+    }
+
     if (discard(game, HUMAN, t, withRiichi)) {
       if (withRiichi) sfx.riichi()
       else sfx.discard()
       setRiichiArmed(false)
+      setPending(null)
       force()
     }
   }
@@ -299,6 +322,11 @@ export const App = () => {
               onClick={() => setAutoTsumogiri((v) => !v)}
               label="リーチ後ツモ切り"
             />
+            <Toggle
+              on={confirmTap}
+              onClick={() => { setConfirmTap((v) => !v); setPending(null) }}
+              label="タップ確認"
+            />
             <Toggle on={sound} onClick={() => setSound((v) => !v)} label={sound ? '音 ♪' : '音 ✕'} />
           </div>
           <div className="table-wrap">
@@ -316,6 +344,7 @@ export const App = () => {
                   debug={debug}
                   opts={i === HUMAN ? opts : undefined}
                   riichiArmed={i === HUMAN && riichiArmed}
+                  pending={i === HUMAN ? pending : null}
                   onDiscard={onDiscard}
                 />
               ))}
@@ -351,9 +380,13 @@ export const App = () => {
                       ツモ
                     </button>
                   )}
+                  {/* リーチ中は「やめる」に変わる。ポン/パスと同じ操作バーの位置。 */}
                   {opts.riichiTiles.length > 0 && (
-                    <button className={riichiArmed ? 'on' : ''} onClick={() => setRiichiArmed((v) => !v)}>
-                      {riichiArmed ? 'リーチ解除' : 'リーチ'}
+                    <button
+                      className={riichiArmed ? 'pass' : 'call'}
+                      onClick={() => setRiichiArmed((v) => !v)}
+                    >
+                      {riichiArmed ? 'やめる' : 'リーチ'}
                     </button>
                   )}
                   {opts.kanTiles.map((t) => (
@@ -380,16 +413,7 @@ export const App = () => {
                   <button className="pass" onClick={() => { respondCall(game, HUMAN, 'pass'); force() }}>パス</button>
                 </>
               )}
-
             </div>
-
-            {/* リーチは2段階操作なので、次に何をすべきかを大きく出す */}
-            {riichiArmed && (
-              <div className="riichi-guide">
-                <b>リーチ</b> 光っている牌を切ってください
-                <button onClick={() => setRiichiArmed(false)}>やめる</button>
-              </div>
-            )}
 
             {effect && (
               <div className={`call-effect ef-${effect.dir} ef-${effect.kind}`}>
@@ -402,7 +426,6 @@ export const App = () => {
               <Result
                 game={game}
                 stakes={stakes}
-                points={points}
                 chips={chips}
                 houseRake={houseRake}
                 canContinue={canContinue}
@@ -476,10 +499,12 @@ interface SeatProps {
   debug: boolean
   opts?: ReturnType<typeof turnOptions>
   riichiArmed: boolean
+  /** タップ確認で持ち上がっている牌。 */
+  pending: TileId | null
   onDiscard: (t: TileId) => void
 }
 
-const SeatArea = ({ game, player, dir, chips, points, stakes, human, debug, opts, riichiArmed, onDiscard }: SeatProps) => {
+const SeatArea = ({ game, player, dir, chips, points, stakes, human, debug, opts, riichiArmed, pending, onDiscard }: SeatProps) => {
   const active = game.turn === player.seat && game.phase === 'discard'
   // 局が終わっても開けるのは和了者だけ。降りた他家の手牌は伏せたままにする。
   const reveal = human || debug || (game.phase === 'end' && game.result?.winner === player.seat)
@@ -525,6 +550,7 @@ const SeatArea = ({ game, player, dir, chips, points, stakes, human, debug, opts
                 selectable={canPick}
                 // リーチ宣言牌は光らせる。これが無いと、どれを押せばいいのか分からない。
                 pick={riichiArmed && canPick}
+                armed={canPick && pending === t}
                 dim={riichiArmed && !!opts && !opts.riichiTiles.includes(t)}
                 onClick={canPick ? () => onDiscard(t) : undefined}
               />
@@ -543,6 +569,7 @@ const SeatArea = ({ game, player, dir, chips, points, stakes, human, debug, opts
                 small={!human}
                 selectable={drawnPickable}
                 pick={riichiArmed && drawnPickable}
+                armed={drawnPickable && pending === drawn}
                 dim={riichiArmed && !!opts && !opts.riichiTiles.includes(drawn)}
                 onClick={drawnPickable ? () => onDiscard(drawn) : undefined}
               />
@@ -629,7 +656,6 @@ const Melds = ({
 const Result = ({
   game,
   stakes,
-  points,
   chips,
   houseRake,
   canContinue,
@@ -639,7 +665,6 @@ const Result = ({
 }: {
   game: GameState
   stakes: StakeSettings
-  points: number[]
   chips: number[]
   houseRake: number
   canContinue: boolean
@@ -738,8 +763,8 @@ const Result = ({
                 {seatName(i, game.seatCount)}
                 {game.dealer === i && <span className="badge dealer">親</span>}
               </td>
-              <td className="score">{points[i] > 0 ? `+${points[i]}` : points[i]}点</td>
-              <td className="delta">{d === 0 ? '' : fmt(d)}</td>
+              {/* 累計点は出さない。この局の増減と、精算後の持ち額だけ見せる。 */}
+              <td className="delta">{d === 0 ? '' : `${fmt(d)}点`}</td>
               {stakes.rate > 0 && (
                 <>
                   <td className="chip">{formatChips(chips[i])}W</td>

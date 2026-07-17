@@ -160,6 +160,28 @@ input { cursor: text; }
  * リーチ宣言牌の候補。リーチは「押してから宣言牌を選ぶ」2段階なので、
  * どれを押せばいいのかが一目で分からないと「リーチできない」ように見える。
  */
+/*
+ * タップ確認で持ち上がっている牌。もう一度押すと切れる。
+ * 誤打を防ぐのが目的なので、どれを切ろうとしているかが明確に分かるようにする。
+ */
+.tile.is-armed { z-index: 5; }
+.side-bottom .tile.is-armed { transform: translateY(-16px); }
+.tile.is-armed .tile-inner {
+  box-shadow: 0 0 0 3px #6fd3ff, 0 6px 16px rgba(0, 0, 0, 0.7);
+  border-radius: 5px;
+}
+.side-bottom .tile.is-armed::after {
+  content: 'もう一度で切る';
+  position: absolute;
+  left: 50%;
+  bottom: -15px;
+  transform: translateX(-50%);
+  font-size: 9px;
+  color: #6fd3ff;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 .tile.is-pick { z-index: 4; }
 .tile.is-pick .tile-inner {
   box-shadow: 0 0 0 3px var(--gold), 0 0 18px 4px rgba(224, 187, 99, 0.85);
@@ -409,33 +431,6 @@ input { cursor: text; }
 .actions button.call { background: linear-gradient(#3f7fbf, #245287); border-color: #8fc4f0; }
 .actions button.pass { min-width: 78px; font-size: 17px; padding: 15px 18px; background: linear-gradient(#3a463f, #232c27); }
 .actions button.on { background: linear-gradient(#f0cd77, #d4a63f); color: #1a1a1a; border-color: #fff0c4; }
-/* リーチ宣言待ちの案内。手牌のすぐ上に横帯で出す。 */
-.riichi-guide {
-  position: absolute;
-  left: 50%;
-  bottom: 96px;
-  transform: translateX(-50%);
-  z-index: 6;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  white-space: nowrap;
-  padding: 8px 14px;
-  font-size: 14px;
-  color: #1a1a1a;
-  background: linear-gradient(#f7d98c, #e0bb63);
-  border-radius: 6px;
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.6);
-}
-.riichi-guide b { font-size: 17px; letter-spacing: 0.1em; }
-.riichi-guide button {
-  padding: 4px 10px;
-  font-size: 12px;
-  background: rgba(0, 0, 0, 0.72);
-  color: #fff;
-  border-color: rgba(0, 0, 0, 0.4);
-}
-
 /* 常用の設定は卓の左下に縦に並べる (卓の上には重ねない) */
 .opt-rail {
   position: absolute;
@@ -731,9 +726,6 @@ input { cursor: text; }
     border-top: 1px solid var(--line);
   }
   .opt-rail .toggle { min-width: 0; padding: 5px 8px; font-size: 11px; }
-
-  .riichi-guide { bottom: 8px; font-size: 12px; padding: 6px 10px; }
-  .riichi-guide b { font-size: 14px; }
 
   .result { width: min(94%, 400px); padding: 10px; }
   .win-hand { padding: 6px 2px; }

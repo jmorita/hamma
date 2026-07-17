@@ -19,6 +19,8 @@ interface Props {
   dim?: boolean
   /** リーチ宣言牌の候補。光らせて選ぶべき牌を示す。 */
   pick?: boolean
+  /** タップ確認で持ち上がっている牌 (もう一度押すと切れる)。 */
+  armed?: boolean
   /** ツモってきた牌。少し離して置く。 */
   drawn?: boolean
 }
@@ -33,6 +35,7 @@ export const Tile = ({
   selectable,
   dim,
   pick,
+  armed,
   drawn,
 }: Props) => {
   // 席の向きとリーチ宣言牌の横倒しを合成した最終的な角度。
@@ -47,6 +50,7 @@ export const Tile = ({
     selectable ? 'is-sel' : '',
     dim ? 'is-dim' : '',
     pick ? 'is-pick' : '',
+    armed ? 'is-armed' : '',
     drawn ? 'is-drawn' : '',
   ]
     .filter(Boolean)
