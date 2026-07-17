@@ -28,18 +28,33 @@
   --table-h: min(
     760px,
     calc(100vh - var(--chrome)),
-    calc(var(--table-w) - 100px + var(--seat-band) + 68px)
+    calc(var(--table-w) - 100px + var(--seat-band) + var(--top-band))
   );
 
-  /* 手牌の大きさは卓の「幅」から決める。14枚 + ツモ牌の間隔で実質14.6枚ぶん。 */
-  --tw: min(46px, calc((var(--table-w) - 24px) / 14.6));
+  /* 卓の枠の太さ。狭い画面では牌に幅を回したいので細くする。 */
+  --frame: 6px;
+  /* ツモ牌を離す幅。 */
+  --tsumo-gap: 16px;
+  /*
+   * 手牌の大きさは卓の「幅」から決める。
+   * 内側の幅 = 卓幅 - 枠2つ。そこに13枚 + 間隔 + ツモ牌1枚が収まる大きさ。
+   */
+  --tw: min(
+    46px,
+    calc((var(--table-w) - 2 * var(--frame) - var(--tsumo-gap) - 4px) / 14)
+  );
   /* 牌画像は 66x90 なので、その比率に合わせる */
   --th: calc(var(--tw) * 1.364);
 
   /* 手前の席が使う帯 = 名札 + 手牌 (手前だけ大きい牌を使う) */
   --seat-band: calc(var(--th) + 28px);
-  /* 河は上下の席に挟まれた正方形。奥の席は小さい牌なので、その帯は 68px 見ておく。 */
-  --pond: max(84px, min(calc(var(--table-h) - var(--seat-band) - 68px), calc(var(--table-w) - 100px)));
+  /* 奥の席の帯。小さい牌なので手前より狭くて足りる。 */
+  --top-band: 68px;
+  /* 河は上下の帯に挟まれた正方形。 */
+  --pond: max(
+    84px,
+    min(calc(var(--table-h) - var(--seat-band) - var(--top-band)), calc(var(--table-w) - 100px))
+  );
 
   /* 河は6列 + 列間5つの隙間が河1マス(河の1/3)に収まる必要がある。
      隙間を勘定に入れないと両端の牌がマスからはみ出す。 */
@@ -198,7 +213,7 @@ input { cursor: text; }
  * 理牌された本体とは離して置き、別枠であることを見て分かるようにする。
  */
 .tsumo-slot { flex: none; display: block; position: relative; }
-.side-bottom .tsumo-slot, .side-top .tsumo-slot { width: var(--tw); height: var(--th); margin-left: 16px; }
+.side-bottom .tsumo-slot, .side-top .tsumo-slot { width: var(--tw); height: var(--th); margin-left: var(--tsumo-gap); }
 .side-bottom .tsumo-slot:not(.big), .side-top .tsumo-slot:not(.big) { width: var(--tw-sm); height: var(--th-sm); }
 /* 左右の席は牌が横倒しなので、縦横を入れ替えて確保する */
 .side-left .tsumo-slot, .side-right .tsumo-slot { width: var(--th-sm); height: var(--tw-sm); margin-top: 16px; }
@@ -226,7 +241,7 @@ input { cursor: text; }
   width: var(--table-w);
   height: var(--table-h);
   border-radius: 10px;
-  border: 6px solid var(--wood);
+  border: var(--frame) solid var(--wood);
   background: radial-gradient(ellipse at 50% 44%, var(--felt) 0%, var(--felt-dark) 82%);
   box-shadow:
     inset 0 0 0 1px rgba(0, 0, 0, 0.5),
@@ -235,7 +250,13 @@ input { cursor: text; }
 }
 
 /* --- 各席 --- */
-.side { position: absolute; display: flex; gap: 8px; }
+/*
+ * 席の枠自体はクリックを受け取らない。枠は牌より大きく、狭い画面では
+ * 隣の席の枠が自分の手牌に覆いかぶさってタップを奪ってしまうため。
+ * 実体のある牌と名札だけが受け取る。
+ */
+.side { position: absolute; display: flex; gap: 8px; pointer-events: none; }
+.side .tile, .side .plate, .side .meld { pointer-events: auto; }
 .side .rack { display: flex; align-items: center; gap: 10px; }
 
 .side-bottom { bottom: 6px; left: 50%; transform: translateX(-50%); flex-direction: column; align-items: center; }
@@ -300,11 +321,16 @@ input { cursor: text; }
 .badge.riichi { background: var(--hot); }
 
 /* --- 捨て牌 (河) --- */
+/*
+ * 河は上下中央ではなく「奥の帯のすぐ下」に置く。
+ * 上下の帯は幅が違う (手前は大きい牌なので広い) ため、中央に置くと
+ * 高さの足りない画面で手前の名札と河が重なってしまう。
+ */
 .pond {
   position: absolute;
-  top: 50%;
+  top: var(--top-band);
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
   /* マスは正方形にする (左右の河は中身を90度回すので、正方形でないとはみ出す)。 */
   width: var(--pond);
   height: var(--pond);
@@ -497,6 +523,39 @@ input { cursor: text; }
   to { opacity: 1; scale: 1; }
 }
 
+/* 開始前の画面。卓全体を覆う。 */
+.start-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  border-radius: 8px;
+  background: rgba(4, 14, 10, 0.88);
+  backdrop-filter: blur(2px);
+}
+.start-title {
+  font-size: 46px;
+  font-weight: bold;
+  letter-spacing: 0.2em;
+  color: var(--gold);
+  text-shadow: 0 3px 12px rgba(0, 0, 0, 0.8);
+}
+.start-sub { font-size: 12px; color: var(--muted); }
+.start-btn {
+  min-width: 200px;
+  padding: 16px 32px;
+  font-size: 20px;
+  font-weight: bold;
+  letter-spacing: 0.2em;
+  border-radius: 8px;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.5), 0 6px 18px rgba(0, 0, 0, 0.6);
+}
+.start-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5); }
+
 /* 結果も卓の中央に重ねる (下に置くと画面外に出て「次の局へ」に気づけない) */
 .result {
   position: absolute;
@@ -680,8 +739,12 @@ input { cursor: text; }
   :root {
     /* ヘッダー + 下の操作バー(2段: 鳴きなし等 + ポン/パス等)のぶん */
     --chrome: 132px;
+    /* 狭い画面では幅を1pxでも牌に回す */
+    --table-w: 100vw;
+    --frame: 3px;
+    --tsumo-gap: 8px;
   }
-  .app { padding: 6px; }
+  .app { padding: 6px 0; }
   header { margin-bottom: 4px; }
   h1 { font-size: 15px; margin: 0; }
   .tabs button { padding: 4px 8px; font-size: 12px; }

@@ -55,14 +55,17 @@ export const App = () => {
   const [back, setBack] = useState<BackColor>(() => pickBackColor('random'))
   const [fs, setFs] = useState(false)
   /**
-   * タップ確認。1回目のタップで牌を持ち上げ、同じ牌をもう一度タップして初めて切る。
-   * 画面が小さい端末では牌が隣り合っていて誤打しやすいので、タッチ端末では既定でON。
+   * ダブルタップ打牌。1回目のタップで牌を持ち上げ、同じ牌をもう一度タップして初めて切る。
+   * 誤打を防ぎたい人向けの選択肢で、既定はシングルタップ (設定タブで切替)。
    */
-  const [confirmTap, setConfirmTap] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches,
-  )
+  const [confirmTap, setConfirmTap] = useState(false)
   /** 確認待ちの牌 (タップ確認がONのとき)。 */
   const [pending, setPending] = useState<TileId | null>(null)
+  /**
+   * 開始前かどうか。いきなり配牌が始まらないようにする。
+   * ブラウザは操作なしに音を鳴らせないので、開始のタップで効果音も有効になる。
+   */
+  const [started, setStarted] = useState(false)
 
   // ESC等で全画面を抜けた場合もボタンの表示を合わせる
   useEffect(() => {
@@ -165,7 +168,7 @@ export const App = () => {
 
   // 鳴きなし / 自動アガリ。人間の応答を自動で返す。
   useEffect(() => {
-    if (effect) return
+    if (!started || effect) return
     if (game.phase === 'call') {
       const mc = game.pendingCalls.find((c) => c.seat === HUMAN && c.response === null)
       if (!mc) return
@@ -209,11 +212,11 @@ export const App = () => {
       }, 260)
       return () => clearTimeout(id)
     }
-  }, [game, tick, autoWin, noCall, autoTsumogiri, effect, announce])
+  }, [game, tick, autoWin, noCall, autoTsumogiri, effect, announce, started])
 
-  // CPUの手番を進める。演出中は止める。
+  // CPUの手番を進める。開始前と演出中は止める。
   useEffect(() => {
-    if (game.phase === 'end' || effect) return
+    if (!started || game.phase === 'end' || effect) return
 
     if (game.phase === 'call') {
       const next = game.pendingCalls.find((c) => c.response === null && game.players[c.seat].isCpu)
@@ -248,7 +251,7 @@ export const App = () => {
       force()
     }, CPU_DELAY_MS)
     return () => clearTimeout(id)
-  }, [game, tick, effect, announce])
+  }, [game, tick, effect, announce, started])
 
   const opts = turnOptions(game, HUMAN)
   const myCall = game.phase === 'call' ? game.pendingCalls.find((c) => c.seat === HUMAN) : undefined
@@ -299,6 +302,11 @@ export const App = () => {
         <SettingsPanel
           seatCount={seatCount}
           stakes={stakes}
+          confirmTap={confirmTap}
+          onConfirmTap={(v) => {
+            setConfirmTap(v)
+            setPending(null)
+          }}
           backSetting={backSetting}
           onBackSetting={(v) => {
             setBackSetting(v)
@@ -321,11 +329,6 @@ export const App = () => {
               on={autoTsumogiri}
               onClick={() => setAutoTsumogiri((v) => !v)}
               label="リーチ後ツモ切り"
-            />
-            <Toggle
-              on={confirmTap}
-              onClick={() => { setConfirmTap((v) => !v); setPending(null) }}
-              label="タップ確認"
             />
             <Toggle on={sound} onClick={() => setSound((v) => !v)} label={sound ? '音 ♪' : '音 ✕'} />
           </div>
@@ -373,7 +376,7 @@ export const App = () => {
 
               {/* 操作ボタンは卓の上に重ねる。卓の下に置くと画面外に出て気づけない。 */}
               <div className="actions">
-              {game.turn === HUMAN && game.phase === 'discard' && (
+              {started && game.turn === HUMAN && game.phase === 'discard' && (
                 <>
                   {opts.canTsumo && (
                     <button className="hot" onClick={() => { declareTsumo(game, HUMAN); announce('tsumo', HUMAN); force() }}>
@@ -397,7 +400,7 @@ export const App = () => {
                 </>
               )}
 
-              {myCall && myCall.response === null && (
+              {started && myCall && myCall.response === null && (
                 <>
                   {myCall.options.includes('ron') && (
                     <button className="hot" onClick={() => { respondCall(game, HUMAN, 'ron'); announce('ron', HUMAN); force() }}>
@@ -414,6 +417,28 @@ export const App = () => {
                 </>
               )}
             </div>
+
+            {/* 開始前。押されるまで配牌も進行も始めない。 */}
+            {!started && (
+              <div className="start-screen">
+                <div className="start-title">韓麻</div>
+                <div className="start-sub">
+                  {seatCount}人打ち / CPU{seatCount - 1}人
+                  {stakes.rate > 0 && ` / 1点 = ${formatChips(stakes.rate)}W`}
+                </div>
+                <button
+                  className="hot start-btn"
+                  onClick={() => {
+                    setBack(pickBackColor(backSetting))
+                    setGame(createGame({ seatCount, rules }))
+                    setSettled(false)
+                    setStarted(true)
+                  }}
+                >
+                  開始
+                </button>
+              </div>
+            )}
 
             {effect && (
               <div className={`call-effect ef-${effect.dir} ef-${effect.kind}`}>
@@ -807,23 +832,43 @@ const Result = ({
 const SettingsPanel = ({
   seatCount,
   stakes,
+  confirmTap,
+  onConfirmTap,
   backSetting,
   onBackSetting,
   onApply,
 }: {
   seatCount: number
   stakes: StakeSettings
+  confirmTap: boolean
+  onConfirmTap: (v: boolean) => void
   backSetting: BackColorSetting
   onBackSetting: (v: BackColorSetting) => void
   onApply: (count: number, st: StakeSettings) => void
 }) => {
   const [count, setCount] = useState(seatCount)
   const [st, setSt] = useState(stakes)
+  // 打牌方法はタッチ端末でしか意味が無いので、マウス環境では出さない。
+  const touch = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
 
   const set = <K extends keyof StakeSettings>(k: K, v: StakeSettings[K]) => setSt((s) => ({ ...s, [k]: v }))
 
   return (
     <div className="settings">
+      {touch && (
+        <>
+          <h3>打牌</h3>
+          <div className="seg">
+            <button className={!confirmTap ? 'on' : ''} onClick={() => onConfirmTap(false)}>
+              シングルタップ
+            </button>
+            <button className={confirmTap ? 'on' : ''} onClick={() => onConfirmTap(true)}>
+              ダブルタップ
+            </button>
+          </div>
+        </>
+      )}
+
       <h3>牌の背の色</h3>
       <div className="seg">
         <button className={backSetting === 'random' ? 'on' : ''} onClick={() => onBackSetting('random')}>
