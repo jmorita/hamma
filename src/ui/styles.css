@@ -772,9 +772,13 @@ input { cursor: text; }
 .ef-left   { left: 90px; top: 50%; transform: translateY(-50%); }
 .ef-right  { right: 90px; top: 50%; transform: translateY(-50%); }
 
-.ef-pon, .ef-kan { color: #8fd0ff; }
-.ef-riichi { color: #ffd970; }
-.ef-ron, .ef-tsumo { color: #ff8b6e; font-size: 58px; }
+/*
+ * 掛け声の文字色はすべて白で統一する。種類の見分けは、白字の下に敷く
+ * 色付きグローだけで表す (文字そのものは白のまま)。
+ */
+.ef-pon, .ef-kan { color: #fff; text-shadow: 0 0 18px rgba(0, 0, 0, 0.9), 0 0 22px rgba(143, 208, 255, 0.9); }
+.ef-riichi { color: #fff; text-shadow: 0 0 18px rgba(0, 0, 0, 0.9), 0 0 22px rgba(255, 217, 112, 0.9); }
+.ef-ron, .ef-tsumo { color: #fff; font-size: 58px; text-shadow: 0 0 18px rgba(0, 0, 0, 0.9), 0 0 24px rgba(255, 139, 110, 0.95); }
 
 @keyframes pop {
   from { opacity: 0; scale: 0.5; }
@@ -898,7 +902,8 @@ input { cursor: text; }
   font-size: 26px;
   font-weight: bold;
   letter-spacing: 0.1em;
-  color: #ff8b6e;
+  /* アガリ画面の「ツモ / ロン」も白で統一する。 */
+  color: #fff;
 }
 .headline .pts {
   font-size: 30px;
@@ -1229,6 +1234,19 @@ input { cursor: text; }
    */
   .side-left { flex-direction: row-reverse; align-items: center; }
   .side-right { flex-direction: row; align-items: center; }
+  /*
+   * 対面の名札は卓の上端へ上げる。既定位置 (top: --th-sm + 50px ≒ 90px) では
+   * 河の上端 (48px) に食い込むため。上げ先は対面手牌の右端とタブの間の空きで、
+   * 手牌 (上端付近・中央寄り) ともタブ (右上) とも横にずれるので重ならない。
+   * 河の上端 (48px) より下がらないよう、名札を一回り小さくして高さを詰める。
+   */
+  .side-top .plate {
+    top: 3px;
+    padding: 2px 7px;
+    font-size: 10px;
+    gap: 0;
+    line-height: 1.2;
+  }
   .actions button { padding: 8px 12px; font-size: 14px; min-width: 58px; }
   .actions button.pass { padding: 8px 10px; font-size: 13px; min-width: 48px; }
   .opt-menu > summary { padding: 4px 9px; font-size: 11px; }
