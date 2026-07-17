@@ -1,0 +1,18 @@
+{
+  "name": "韓麻",
+  "short_name": "韓麻",
+  "description": "韓国式麻雀『韓麻』。CPUと対戦できます。",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#06120d",
+  "theme_color": "#06120d",
+  "icons": [
+    {
+      "src": "tiles/ji1-66-90-l.png",
+      "sizes": "66x90",
+      "type": "image/png"
+    }
+  ]
+}

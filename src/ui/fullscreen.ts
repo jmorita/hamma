@@ -18,6 +18,25 @@ export const isFullscreen = (): boolean => document.fullscreenElement !== null
 export const supportsFullscreen = (): boolean =>
   typeof document !== 'undefined' && !!document.documentElement.requestFullscreen
 
+/**
+ * iOS の Safari は全画面APIを持たない (requestFullscreen も webkit 版も無い)。
+ * 代わりにホーム画面へ追加するとURLバーが消えて全画面相当になるので、
+ * ボタンの代わりにその案内を出す。
+ */
+export const isIosSafari = (): boolean => {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent
+  const iOS = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)
+  const safari = /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua)
+  return iOS && safari
+}
+
+/** ホーム画面から起動した状態 (この場合は既にURLバーが無い)。 */
+export const isStandalone = (): boolean =>
+  typeof window !== 'undefined' &&
+  (window.matchMedia('(display-mode: standalone)').matches ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true)
+
 export const enterFullscreen = async (): Promise<void> => {
   try {
     await document.documentElement.requestFullscreen()

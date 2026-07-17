@@ -2,8 +2,21 @@
 <html lang="ja">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- ノッチの内側に収め、ピンチ拡大での誤操作も防ぐ -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no"
+    />
     <title>韓麻</title>
+    <meta name="theme-color" content="#06120d" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <!--
+      iOS Safari は全画面APIを持たない。ホーム画面に追加したときだけ
+      URLバーの無い全画面で起動できるので、そのための指定。
+    -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="韓麻" />
   </head>
   <body>
     <div id="root"></div>

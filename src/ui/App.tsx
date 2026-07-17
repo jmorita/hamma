@@ -21,7 +21,14 @@ import { Tile, type Dir } from './Tile'
 import { RulesPanel } from './RulesPanel'
 import { sfx, setSoundEnabled } from './sound'
 import { BACK_COLORS, pickBackColor, type BackColor, type BackColorSetting } from './backColor'
-import { isFullscreen, onFullscreenChange, supportsFullscreen, toggleFullscreen } from './fullscreen'
+import {
+  isFullscreen,
+  isIosSafari,
+  isStandalone,
+  onFullscreenChange,
+  supportsFullscreen,
+  toggleFullscreen,
+} from './fullscreen'
 
 const HUMAN: Seat = 0
 const CPU_DELAY_MS = 420
@@ -33,7 +40,7 @@ const CPU_DELAY_MS = 420
 const dirsFor = (seatCount: number): Dir[] =>
   seatCount === 3 ? ['bottom', 'right', 'left'] : ['bottom', 'right', 'top', 'left']
 
-type Tab = 'table' | 'rules' | 'settings'
+type Tab = 'table' | 'rules' | 'settings' | 'fs'
 
 export const App = () => {
   const [seatCount, setSeatCount] = useState(4)
@@ -283,10 +290,18 @@ export const App = () => {
         <h1>韓麻</h1>
         <nav className="tabs">
           {debug && <span className="dbg">デバッグ表示中 (jj で解除)</span>}
-          {supportsFullscreen() && (
+          {supportsFullscreen() ? (
             <button className="tab fs" onClick={() => void toggleFullscreen()}>
               {fs ? '⤢ 解除' : '⛶ 全画面'}
             </button>
+          ) : (
+            // iOS Safari には全画面APIが無い。ボタンが無い理由と代替手段を出す。
+            isIosSafari() &&
+            !isStandalone() && (
+              <button className="tab fs" onClick={() => setTab('fs')}>
+                ⛶ 全画面
+              </button>
+            )
           )}
           {(['table', 'rules', 'settings'] as Tab[]).map((t) => (
             <button key={t} className={tab === t ? 'tab on' : 'tab'} onClick={() => setTab(t)}>
@@ -297,6 +312,34 @@ export const App = () => {
       </header>
 
       {tab === 'rules' && <RulesPanel rules={rules} stakes={stakes} seatCount={seatCount} />}
+
+      {/* iOS Safari 向けの案内。全画面APIが無いのでホーム画面追加を勧める。 */}
+      {tab === 'fs' && (
+        <div className="settings">
+          <h3>全画面にする (iPhone / iPad)</h3>
+          <p className="note">
+            iOSのSafariは全画面表示の機能を持たないため、このアプリからは切り替えられません。
+            代わりにホーム画面へ追加すると、URLバーが消えて全画面と同じ状態で遊べます。
+          </p>
+          <ol className="howto">
+            <li>画面下の<b>共有ボタン</b> (□に↑の形) を押す</li>
+            <li>
+              メニューを下にたどって<b>「ホーム画面に追加」</b>を押す
+            </li>
+            <li>右上の<b>「追加」</b>を押す</li>
+            <li>ホーム画面にできたアイコンから起動する</li>
+          </ol>
+          <p className="note">
+            横向きにすると手牌が大きくなります。ホーム画面から起動すればURLバーのぶんも
+            卓に使えるので、河の牌も見やすくなります。
+          </p>
+          <div className="apply">
+            <button className="hot" onClick={() => setTab('table')}>
+              卓に戻る
+            </button>
+          </div>
+        </div>
+      )}
 
       {tab === 'settings' && (
         <SettingsPanel
