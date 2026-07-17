@@ -19,16 +19,18 @@ export const supportsFullscreen = (): boolean =>
   typeof document !== 'undefined' && !!document.documentElement.requestFullscreen
 
 /**
- * iOS の Safari は全画面APIを持たない (requestFullscreen も webkit 版も無い)。
- * 代わりにホーム画面へ追加するとURLバーが消えて全画面相当になるので、
- * ボタンの代わりにその案内を出す。
+ * iOS かどうか。
+ *
+ * iOS は Chrome や Firefox も中身が WebKit に強制されるため、
+ * ブラウザを問わず全画面APIが無い (実測で requestFullscreen も webkit 版も undefined)。
+ * よってブラウザ名では絞らず、iOS 全体を対象にする。
+ * 代わりにホーム画面へ追加するとURLバーが消えて全画面相当になるので、その案内を出す。
  */
-export const isIosSafari = (): boolean => {
+export const isIos = (): boolean => {
   if (typeof navigator === 'undefined') return false
   const ua = navigator.userAgent
-  const iOS = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)
-  const safari = /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua)
-  return iOS && safari
+  // iPadOS は UA が Macintosh を名乗るので、タッチの有無で見分ける。
+  return /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)
 }
 
 /** ホーム画面から起動した状態 (この場合は既にURLバーが無い)。 */

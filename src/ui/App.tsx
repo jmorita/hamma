@@ -23,7 +23,7 @@ import { sfx, setSoundEnabled } from './sound'
 import { BACK_COLORS, pickBackColor, type BackColor, type BackColorSetting } from './backColor'
 import {
   isFullscreen,
-  isIosSafari,
+  isIos,
   isStandalone,
   onFullscreenChange,
   supportsFullscreen,
@@ -295,8 +295,9 @@ export const App = () => {
               {fs ? '⤢ 解除' : '⛶ 全画面'}
             </button>
           ) : (
-            // iOS Safari には全画面APIが無い。ボタンが無い理由と代替手段を出す。
-            isIosSafari() &&
+            // iOS は全画面APIが無い (Chrome等も中身はWebKitなので同じ)。
+            // ボタンが無い理由と代替手段を出す。
+            isIos() &&
             !isStandalone() && (
               <button className="tab fs" onClick={() => setTab('fs')}>
                 ⛶ 全画面
@@ -313,16 +314,21 @@ export const App = () => {
 
       {tab === 'rules' && <RulesPanel rules={rules} stakes={stakes} seatCount={seatCount} />}
 
-      {/* iOS Safari 向けの案内。全画面APIが無いのでホーム画面追加を勧める。 */}
+      {/* iOS 向けの案内。全画面APIが無いのでホーム画面追加を勧める。 */}
       {tab === 'fs' && (
         <div className="settings">
           <h3>全画面にする (iPhone / iPad)</h3>
           <p className="note">
-            iOSのSafariは全画面表示の機能を持たないため、このアプリからは切り替えられません。
+            iOSは全画面表示の機能をWebページに開放していないため、このアプリからは切り替えられません
+            (Chrome や Firefox もiOSでは中身がSafariと同じなので同様です)。
             代わりにホーム画面へ追加すると、URLバーが消えて全画面と同じ状態で遊べます。
           </p>
           <ol className="howto">
-            <li>画面下の<b>共有ボタン</b> (□に↑の形) を押す</li>
+            <li>
+              <b>共有ボタン</b>を押す
+              <br />
+              <span className="sub2">Safari: 画面下の □に↑ / Chrome: 画面右下の … </span>
+            </li>
             <li>
               メニューを下にたどって<b>「ホーム画面に追加」</b>を押す
             </li>
