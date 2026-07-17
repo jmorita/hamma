@@ -83,8 +83,15 @@
    * 上下と左右が同じ形なら幅と高さの必要量は一致する = 正方形にしかならない。
    * 形を分けて初めて長方形にできる。
    */
-  --pond-w-span: calc(2 * var(--kawa-rows-v) * 1.364 + var(--kawa-cols-h));
-  --pond-h-span: calc(2 * var(--kawa-rows-h) * 1.364 + var(--kawa-cols-v));
+  /*
+   * 河の幅には「宣言牌ぶんの +0.364」を足しておく。
+   * リーチの宣言牌は横倒しなので幅が牌1.364枚ぶんあり、ちょうど列数ぶんの幅しか
+   * 無いと宣言牌のある行だけ1枚あふれて折り返し、行末に隙間が残る。
+   * 0.364枚ぶん広げておけば宣言牌のある行も同じ枚数が並び、隙間が出ない。
+   * (0.364 は牌1枚ぶん未満なので、宣言牌の無い行の枚数は増えない)
+   */
+  --pond-w-span: calc(2 * var(--kawa-rows-v) * 1.364 + var(--kawa-cols-h) + 0.364);
+  --pond-h-span: calc(2 * var(--kawa-rows-h) * 1.364 + var(--kawa-cols-v) + 0.364);
   /* 牌と牌の1pxの隙間ぶん。これを引かないと1列/1段ぶん溢れる。 */
   --pond-w-gaps: calc(2 * var(--kawa-rows-v) * 1px + var(--kawa-cols-h) * 1px + 6px);
   --pond-h-gaps: calc(2 * var(--kawa-rows-h) * 1px + var(--kawa-cols-v) * 1px + 6px);
@@ -111,9 +118,12 @@
   /* 河の深さ (段数ぶん)。マスの一辺ではなくこれだけ確保すればよい。 */
   --kawa-depth-h: calc(var(--kawa-rows-h) * (var(--th-sm) + 1px));
   --kawa-depth-v: calc(var(--kawa-rows-v) * (var(--th-sm) + 1px));
-  /* 中央の枠。上下の河の幅ぶん / 左右の河の長さぶん。 */
-  --pond-center: calc(var(--kawa-cols-h) * (var(--tw-sm) + 1px));
-  --pond-center-h: calc(var(--kawa-cols-v) * (var(--tw-sm) + 1px));
+  /*
+   * 中央の枠。上下の河の幅ぶん / 左右の河の長さぶん (+ 宣言牌ぶんの余裕)。
+   * 必要幅とちょうど同値だと丸め誤差で折り返してしまうので 2px の遊びを持たせる。
+   */
+  --pond-center: calc(var(--kawa-cols-h) * (var(--tw-sm) + 1px) + 0.364 * var(--tw-sm) + 2px);
+  --pond-center-h: calc(var(--kawa-cols-v) * (var(--tw-sm) + 1px) + 0.364 * var(--tw-sm) + 2px);
   --pond-w: calc(2 * var(--kawa-depth-v) + var(--pond-center));
   --pond-h: calc(2 * var(--kawa-depth-h) + var(--pond-center-h));
   /* 王牌は河・他家の手牌と同じ大きさ。中央枠に4枚 + 隙間 + 余白が収まらなければ縮める。 */
