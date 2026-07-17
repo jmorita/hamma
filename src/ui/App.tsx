@@ -11,6 +11,7 @@ import {
   type GameState,
   type Seat,
   type Player,
+  type Meld,
 } from '../core/game'
 import { DEFAULT_RULES } from '../core/score'
 import { DEFAULT_STAKES, settle, shortOfDeposit, formatChips, type StakeSettings } from '../core/stakes'
@@ -497,7 +498,7 @@ const SeatArea = ({ game, player, dir, chips, points, stakes, human, debug, opts
       </div>
 
       <div className="rack">
-        <Melds melds={player.melds} dir={dir} />
+        <Melds melds={player.melds} dir={dir} seat={player.seat} seatCount={game.seatCount} />
         <div className="hand">
           {body.map((t, i) => {
             const canPick = !!opts && myTurn && opts.discardable.includes(t) && (!riichiArmed || opts.riichiTiles.includes(t))
@@ -552,17 +553,53 @@ const Discards = ({ player }: { player: Player }) => (
   </div>
 )
 
-const Melds = ({ melds, dir }: { melds: GameState['players'][number]['melds']; dir: Dir }) => (
+/**
+ * 鳴いた牌を横向きに置く位置。麻雀の慣習どおり、位置で「誰から鳴いたか」を示す。
+ *   上家 → 左端 / 対面 → 中 / 下家 → 右端
+ * 暗槓は誰からでもないので -1 (横向きなし)。
+ */
+const calledTileIndex = (m: Meld, seat: Seat, seatCount: number, n: number): number => {
+  if (m.from === null) return -1
+  const rel = (m.from - seat + seatCount) % seatCount
+  if (rel === 1) return n - 1 // 下家 → 右端
+  if (seatCount === 4 && rel === 2) return 1 // 対面 → 中
+  return 0 // 上家 → 左端
+}
+
+const Melds = ({
+  melds,
+  dir,
+  seat,
+  seatCount,
+}: {
+  melds: Meld[]
+  dir: Dir
+  seat: Seat
+  seatCount: number
+}) => (
   <div className="melds">
-    {melds.map((m, i) => (
-      <span key={i} className="meld">
-        {Array.from({ length: m.kind === 'pon' ? 3 : 4 }).map((_, j) => {
-          // 暗槓は両端を伏せる。
-          const hidden = m.kind === 'ankan' && (j === 0 || j === 3)
-          return <Tile key={j} tile={hidden ? undefined : m.tile} back={hidden} dir={dir} small />
-        })}
-      </span>
-    ))}
+    {melds.map((m, i) => {
+      const n = m.kind === 'pon' ? 3 : 4
+      const called = calledTileIndex(m, seat, seatCount, n)
+      return (
+        <span key={i} className="meld">
+          {Array.from({ length: n }).map((_, j) => {
+            // 暗槓は両端を伏せる。
+            const hidden = m.kind === 'ankan' && (j === 0 || j === 3)
+            return (
+              <Tile
+                key={j}
+                tile={hidden ? undefined : m.tile}
+                back={hidden}
+                dir={dir}
+                small
+                rotated={j === called}
+              />
+            )
+          })}
+        </span>
+      )
+    })}
   </div>
 )
 
@@ -609,13 +646,8 @@ const Result = ({
       ) : (
         <>
           <div className="win-hand">
-            {winner.melds.map((m, i) => (
-              <span key={`m${i}`} className="meld">
-                {Array.from({ length: m.kind === 'pon' ? 3 : 4 }).map((_, j) => (
-                  <Tile key={j} tile={m.tile} small />
-                ))}
-              </span>
-            ))}
+            {/* 鳴いた牌の向きは卓上と同じにする (どこから鳴いたかが分かる) */}
+            <Melds melds={winner.melds} dir="bottom" seat={winner.seat} seatCount={game.seatCount} />
             <span className="concealed">
               {[...winner.hand].sort((a, b) => a - b).map((t, i) => (
                 <Tile key={i} tile={t} small />
@@ -770,7 +802,6 @@ const SettingsPanel = ({
           </button>
         ))}
       </div>
-      <p className="note">ランダムにすると局ごとに背の色が変わります。</p>
 
       <h3>人数</h3>
       <div className="seg">
@@ -780,12 +811,8 @@ const SettingsPanel = ({
           </button>
         ))}
       </div>
-      <p className="note">韓麻は3人打ちでも136枚を使います。3人だとツモの支払いは2人ぶんになります。</p>
 
       <h3>仮想レート / レーキ</h3>
-      <p className="note warn">
-        仮想の額のみを扱います。金銭は一切扱いません (日本国内で金銭を賭ければ賭博罪に該当し得ます)。
-      </p>
       <div className="fields">
         <label>
           レート (1点あたりの W)
@@ -812,7 +839,6 @@ const SettingsPanel = ({
         <button className="hot" onClick={() => onApply(count, st)}>
           この設定で卓を立て直す
         </button>
-        <span className="note">※ 人数・レートの変更は点数と持ち額をリセットします</span>
       </div>
     </div>
   )
