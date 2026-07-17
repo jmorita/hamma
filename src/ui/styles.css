@@ -843,4 +843,44 @@ input { cursor: text; }
   .headline .how { font-size: 19px; }
 }
 
+/*
+ * 画面が低いとき (スマホ横など)。
+ * 高さが足りず、手牌を最大まで大きくすると河が潰れて読めなくなる。
+ * ここでは高さの取り合いを調整して全体を底上げする:
+ *   - 下のバーを1段にまとめてヘッダーぶんを削り、卓に高さを回す
+ *   - 手牌の上限を下げて、そのぶんを河に回す (それでも縦向きより大きい)
+ *   - 奥の席の帯を詰める (小さい牌しか置かないので広く要らない)
+ */
+@media (max-height: 540px) {
+  :root {
+    --chrome: 88px;
+    --top-band: 46px;
+    --tw: min(
+      34px,
+      calc((var(--table-w) - 2 * var(--frame) - var(--tsumo-gap) - 4px) / 14)
+    );
+  }
+  header { margin-bottom: 2px; }
+
+  /* 操作ボタンと設定を1段に並べる */
+  .opt-rail {
+    bottom: 0;
+    height: 44px;
+    justify-content: flex-start;
+    padding-left: 8px;
+  }
+  .actions {
+    bottom: 0;
+    left: auto;
+    right: 8px;
+    height: 44px;
+    align-items: center;
+    padding: 0;
+    background: none;
+    border-top: none;
+  }
+  .actions button { padding: 8px 12px; font-size: 14px; min-width: 58px; }
+  .actions button.pass { padding: 8px 10px; font-size: 13px; min-width: 48px; }
+}
+
 /* 牌の大きさは卓の幅・高さから算出しているので、狭い画面でも自動で縮む。 */
