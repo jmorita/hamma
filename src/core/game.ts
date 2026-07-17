@@ -34,6 +34,11 @@ export interface Player {
   /** リーチ宣言牌の捨て牌インデックス (横向き表示用)。 */
   riichiTileIndex: number | null
   /**
+   * リーチ宣言牌が鳴かれて河から無くなった状態。
+   * 麻雀の慣習どおり、次に切る牌を代わりに横に置く。
+   */
+  riichiMarkPending: boolean
+  /**
    * 同巡の見逃し。韓麻にフリテンは無いが、同巡のみ見逃しロンができない。
    * ロンを見送った時点で立ち、次の自分のツモで解除される。
    * (リーチ後の見逃しも同巡だけの制限で、恒久フリテンにはならない)
@@ -171,6 +176,7 @@ export const createGame = (
       discards: [],
       riichi: false,
       riichiTileIndex: null,
+      riichiMarkPending: false,
       missedRon: false,
       score: opts.startScore ?? 0,
       isCpu: s !== 0,
@@ -451,6 +457,10 @@ export const discard = (s: GameState, seat: Seat, tile: Tile, riichi = false): b
     p.riichi = true
     p.riichiTileIndex = p.discards.length - 1
     s.log.push(`${seatName(seat, s.seatCount)} リーチ (打 ${tileName(tile)})`)
+  } else if (p.riichiMarkPending) {
+    // 宣言牌が鳴かれていたので、この牌を代わりに横に置く。
+    p.riichiTileIndex = p.discards.length - 1
+    p.riichiMarkPending = false
   }
   s.lastDiscard = { seat, tile }
   s.drawnTile = null
@@ -541,7 +551,14 @@ const resolveCalls = (s: GameState): void => {
   sortHand(p)
   p.melds.push({ kind, tile: d.tile, from: d.seat })
   // 鳴かれた牌は捨て牌から取り除く。
-  s.players[d.seat].discards.pop()
+  const discarder = s.players[d.seat]
+  discarder.discards.pop()
+  // 取り除いたのがリーチ宣言牌だと、横向きの目印が河から消えてしまう。
+  // 麻雀の慣習どおり、次に切る牌を代わりに横に置く。
+  if (discarder.riichiTileIndex !== null && discarder.riichiTileIndex >= discarder.discards.length) {
+    discarder.riichiTileIndex = null
+    discarder.riichiMarkPending = true
+  }
   s.log.push(`${seatName(caller.seat, s.seatCount)} ${kan ? '大明槓' : 'ポン'} ${tileName(d.tile)}`)
 
   s.pendingCalls = []

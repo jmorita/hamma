@@ -307,6 +307,8 @@ export const App = () => {
             setConfirmTap(v)
             setPending(null)
           }}
+          sound={sound}
+          onSound={setSound}
           backSetting={backSetting}
           onBackSetting={(v) => {
             setBackSetting(v)
@@ -321,17 +323,18 @@ export const App = () => {
 
       {tab === 'table' && (
         <>
-          {/* 常時使う設定は卓の左下にまとめる */}
-          <div className="opt-rail">
-            <Toggle on={noCall} onClick={() => setNoCall((v) => !v)} label="鳴きなし" />
-            <Toggle on={autoWin} onClick={() => setAutoWin((v) => !v)} label="自動アガリ" />
-            <Toggle
-              on={autoTsumogiri}
-              onClick={() => setAutoTsumogiri((v) => !v)}
-              label="リーチ後ツモ切り"
-            />
-            <Toggle on={sound} onClick={() => setSound((v) => !v)} label={sound ? '音 ♪' : '音 ✕'} />
-          </div>
+          {/* 対局中に切り替えたい設定だけをまとめる。開始前は出さない。 */}
+          {started && (
+            <div className="opt-rail">
+              <Toggle on={noCall} onClick={() => setNoCall((v) => !v)} label="鳴きなし" />
+              <Toggle on={autoWin} onClick={() => setAutoWin((v) => !v)} label="自動アガリ" />
+              <Toggle
+                on={autoTsumogiri}
+                onClick={() => setAutoTsumogiri((v) => !v)}
+                label="リーチ後ツモ切り"
+              />
+            </div>
+          )}
           <div className="table-wrap">
             <div className={`table seats-${game.seatCount}`}>
               {game.players.map((p, i) => (
@@ -421,14 +424,29 @@ export const App = () => {
             {/* 開始前。押されるまで配牌も進行も始めない。 */}
             {!started && (
               <div className="start-screen">
-                <div className="start-title">韓麻</div>
-                <div className="start-sub">
-                  {seatCount}人打ち / CPU{seatCount - 1}人
-                  {stakes.rate > 0 && ` / 1点 = ${formatChips(stakes.rate)}W`}
+                <div className="start-logo">韓麻</div>
+                <div className="start-sub">HANMA / 韓国式麻雀</div>
+
+                <div className="start-seats">
+                  {[4, 3].map((n) => (
+                    <button
+                      key={n}
+                      className={`start-seat ${seatCount === n ? 'on' : ''}`}
+                      onClick={() => setSeatCount(n)}
+                    >
+                      <b>{n}</b>
+                      <span>人打ち</span>
+                      <em>CPU {n - 1}人</em>
+                    </button>
+                  ))}
                 </div>
+
                 <button
-                  className="hot start-btn"
+                  className="start-btn"
                   onClick={() => {
+                    setPoints(new Array(seatCount).fill(0))
+                    setChips(new Array(seatCount).fill(stakes.startingChips))
+                    setHouseRake(0)
                     setBack(pickBackColor(backSetting))
                     setGame(createGame({ seatCount, rules }))
                     setSettled(false)
@@ -437,6 +455,11 @@ export const App = () => {
                 >
                   開始
                 </button>
+                {stakes.rate > 0 && (
+                  <div className="start-note">
+                    1点 = {formatChips(stakes.rate)}W / レーキ {stakes.rakePercent}%
+                  </div>
+                )}
               </div>
             )}
 
@@ -834,6 +857,8 @@ const SettingsPanel = ({
   stakes,
   confirmTap,
   onConfirmTap,
+  sound,
+  onSound,
   backSetting,
   onBackSetting,
   onApply,
@@ -842,6 +867,8 @@ const SettingsPanel = ({
   stakes: StakeSettings
   confirmTap: boolean
   onConfirmTap: (v: boolean) => void
+  sound: boolean
+  onSound: (v: boolean) => void
   backSetting: BackColorSetting
   onBackSetting: (v: BackColorSetting) => void
   onApply: (count: number, st: StakeSettings) => void
@@ -855,6 +882,12 @@ const SettingsPanel = ({
 
   return (
     <div className="settings">
+      <h3>効果音</h3>
+      <div className="seg">
+        <button className={sound ? 'on' : ''} onClick={() => onSound(true)}>あり</button>
+        <button className={!sound ? 'on' : ''} onClick={() => onSound(false)}>なし</button>
+      </div>
+
       {touch && (
         <>
           <h3>打牌</h3>

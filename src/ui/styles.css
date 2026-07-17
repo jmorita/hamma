@@ -532,29 +532,76 @@ input { cursor: text; }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 14px;
+  gap: 10px;
   border-radius: 8px;
-  background: rgba(4, 14, 10, 0.88);
-  backdrop-filter: blur(2px);
+  /* 卓の緑をうっすら透かして、麻雀卓の上に立っているように見せる */
+  background: radial-gradient(ellipse at 50% 42%, rgba(10, 40, 28, 0.82), rgba(2, 8, 6, 0.96));
+  backdrop-filter: blur(3px);
 }
-.start-title {
-  font-size: 46px;
+
+.start-logo {
+  font-size: clamp(38px, 9vmin, 62px);
   font-weight: bold;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.22em;
+  /* 牌の象牙色から金へのグラデーション */
+  background: linear-gradient(180deg, #fff6d8 0%, #e8c877 48%, #a8802f 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 3px 10px rgba(0, 0, 0, 0.85));
+  /* 字間の分だけ右にずれて見えるのを戻す */
+  margin-right: -0.22em;
+  line-height: 1.1;
+}
+.start-sub {
+  font-size: 10px;
+  letter-spacing: 0.32em;
+  color: var(--muted);
+  margin-right: -0.32em;
+  margin-bottom: 6px;
+}
+.start-note { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+/* 人数選び */
+.start-seats { display: flex; gap: 10px; margin-bottom: 4px; }
+.start-seat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 84px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: var(--muted);
+}
+.start-seat b { font-size: 24px; color: var(--text); line-height: 1; }
+.start-seat span { font-size: 11px; }
+.start-seat em { font-style: normal; font-size: 9px; opacity: 0.65; }
+.start-seat.on {
+  background: linear-gradient(rgba(224, 187, 99, 0.22), rgba(224, 187, 99, 0.08));
+  border-color: var(--gold);
   color: var(--gold);
-  text-shadow: 0 3px 12px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 0 14px rgba(224, 187, 99, 0.3);
 }
-.start-sub { font-size: 12px; color: var(--muted); }
+.start-seat.on b { color: var(--gold); }
+
 .start-btn {
-  min-width: 200px;
-  padding: 16px 32px;
-  font-size: 20px;
+  min-width: 210px;
+  padding: 15px 34px;
+  font-size: 19px;
   font-weight: bold;
-  letter-spacing: 0.2em;
-  border-radius: 8px;
-  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.5), 0 6px 18px rgba(0, 0, 0, 0.6);
+  letter-spacing: 0.35em;
+  margin-right: -0.35em;
+  border-radius: 999px;
+  color: #1a1208;
+  background: linear-gradient(180deg, #ffe9a8 0%, #e5bd63 45%, #b8862f 100%);
+  border: 1px solid #ffeec2;
+  box-shadow: 0 4px 0 #6d4d17, 0 8px 22px rgba(0, 0, 0, 0.65);
 }
-.start-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5); }
+.start-btn:hover { filter: brightness(1.08); border-color: #fff; }
+.start-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #6d4d17, 0 3px 10px rgba(0, 0, 0, 0.6); }
 
 /* 結果も卓の中央に重ねる (下に置くと画面外に出て「次の局へ」に気づけない) */
 .result {

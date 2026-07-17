@@ -92,6 +92,53 @@ describe('局の進行', () => {
   })
 })
 
+describe('リーチ宣言牌の横向き', () => {
+  it('宣言牌が鳴かれたら、次に切る牌を代わりに横に置く', () => {
+    const s = createGame({ seed: 5 })
+    // seat0 をテンパイにして 3p でリーチ宣言させる
+    s.players[0].hand = parseHand('234m678m99p123s45s3p')
+    // seat1 は 3p を2枚持ちなのでポンできる
+    s.players[1].hand = parseHand('33p456m789m123s45s')
+    for (const i of [2, 3]) s.players[i].hand = parseHand('147m258p369s1234z')
+
+    expect(discard(s, 0, tileFromName('3p'), true)).toBe(true)
+    expect(s.players[0].riichi).toBe(true)
+    expect(s.players[0].riichiTileIndex).toBe(0) // 河の1枚目が横向き
+
+    // その宣言牌をポンされると、河から消えて目印が無くなる
+    respondCall(s, 1, 'pon')
+    expect(s.players[0].discards).toHaveLength(0)
+    expect(s.players[0].riichiTileIndex).toBeNull()
+    expect(s.players[0].riichiMarkPending).toBe(true)
+
+    // seat0 の次の打牌が代わりに横向きになる
+    while (s.phase === 'discard' && s.turn !== 0) {
+      discard(s, s.turn, turnOptions(s, s.turn).discardable[0])
+    }
+    expect(s.turn).toBe(0)
+    discard(s, 0, s.drawnTile!)
+    expect(s.players[0].riichiTileIndex).toBe(s.players[0].discards.length - 1)
+    expect(s.players[0].riichiMarkPending).toBe(false)
+  })
+
+  it('宣言牌より後の牌が鳴かれても、宣言牌の横向きは動かない', () => {
+    const s = createGame({ seed: 5 })
+    s.players[0].hand = parseHand('234m678m99p123s45s3p')
+    for (const i of [1, 2, 3]) s.players[i].hand = parseHand('147m258p369s1234z')
+    discard(s, 0, tileFromName('3p'), true)
+    expect(s.players[0].riichiTileIndex).toBe(0)
+
+    // 一巡して seat0 がもう1枚切る (ツモ切り)
+    while (s.phase === 'discard' && s.turn !== 0) {
+      discard(s, s.turn, turnOptions(s, s.turn).discardable[0])
+    }
+    discard(s, 0, s.drawnTile!)
+    // 宣言牌は河の1枚目のまま
+    expect(s.players[0].riichiTileIndex).toBe(0)
+    expect(s.players[0].discards.length).toBeGreaterThan(1)
+  })
+})
+
 describe('食い替え', () => {
   /** seat1 に 3p を3枚持たせ、seat0 の 3p をポンさせる。手に3pが1枚残る。 */
   const ponned = () => {
