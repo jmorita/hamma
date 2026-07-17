@@ -15,6 +15,14 @@
   --chrome: 130px;
 
   /*
+   * 画面の高さ。
+   * iOS の 100vh は「ツールバーが隠れている時の高さ」を返すため、
+   * ツールバーが出ている間はそのぶん下がはみ出し、画面下の操作ボタンが
+   * ツールバーの裏に隠れてしまう。dvh は今実際に見えている高さを返す。
+   */
+  --vh: 100vh;
+
+  /*
    * 卓の幅と高さは別々に決める。正方形に固定すると、横長の画面(スマホ横)で
    * 高さに引きずられて卓ごと小さくなり、手牌まで潰れてしまう。
    */
@@ -27,7 +35,7 @@
    */
   --table-h: min(
     760px,
-    calc(100vh - var(--chrome)),
+    calc(var(--vh) - var(--chrome)),
     calc(var(--table-w) - 100px + var(--seat-band) + var(--top-band))
   );
 
@@ -63,6 +71,11 @@
   /* 王牌は4列。中央マスに4枚 + 隙間3つが収まる大きさに抑える。 */
   --tw-dw: min(var(--tw), calc((var(--pond) / 3 - 10px) / 4));
   --th-dw: calc(var(--tw-dw) * 1.364);
+}
+
+/* dvh に対応していれば、ツールバーの出入りに追従する高さを使う。 */
+@supports (height: 100dvh) {
+  :root { --vh: 100dvh; }
 }
 
 * { box-sizing: border-box; }
@@ -804,14 +817,17 @@ input { cursor: text; }
  */
 @media (max-width: 760px), (max-height: 540px) {
   :root {
-    /* ヘッダー + 下の操作バー(2段: 鳴きなし等 + ポン/パス等)のぶん */
-    --chrome: 132px;
+    /* ヘッダー + 下の操作バー(2段: 鳴きなし等 + ポン/パス等) + ホームインジケータ */
+    --chrome: calc(132px + env(safe-area-inset-bottom));
     /* 狭い画面では幅を1pxでも牌に回す */
     --table-w: 100vw;
     --frame: 3px;
     --tsumo-gap: 8px;
   }
   .app { padding: 6px 0; }
+  /* iPhone下端の横棒 (ホームインジケータ) にボタンが隠れないようにする */
+  .opt-rail { padding-bottom: env(safe-area-inset-bottom); height: calc(38px + env(safe-area-inset-bottom)); }
+  .actions { bottom: calc(38px + env(safe-area-inset-bottom)); }
   header { margin-bottom: 4px; }
   h1 { font-size: 15px; margin: 0; }
   .tabs button { padding: 4px 8px; font-size: 12px; }
@@ -873,7 +889,7 @@ input { cursor: text; }
  */
 @media (max-height: 540px) {
   :root {
-    --chrome: 88px;
+    --chrome: calc(88px + env(safe-area-inset-bottom));
     --top-band: 46px;
     --tw: min(
       34px,
@@ -885,14 +901,15 @@ input { cursor: text; }
   /* 操作ボタンと設定を1段に並べる */
   .opt-rail {
     bottom: 0;
-    height: 44px;
+    height: calc(44px + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
     justify-content: flex-start;
-    padding-left: 8px;
+    padding-left: max(8px, env(safe-area-inset-left));
   }
   .actions {
-    bottom: 0;
+    bottom: env(safe-area-inset-bottom);
     left: auto;
-    right: 8px;
+    right: max(8px, env(safe-area-inset-right));
     height: 44px;
     align-items: center;
     padding: 0;
