@@ -187,9 +187,49 @@ const chord = (notes: number[], start: number, dur: number, gain: number) => {
 
 // 音名 (Hz)
 const C4 = 261.63, G4 = 392, A4 = 440, B4 = 493.88
-const C5 = 523.25, D5 = 587.33, E5 = 659.25, F5 = 698.46, G5 = 783.99, A5 = 880, B5 = 987.77
-const C6 = 1046.5, D6 = 1174.7, E6 = 1318.5, G6 = 1568, A6 = 1760
-const C7 = 2093, E7 = 2637
+const C5 = 523.25, D5 = 587.33, E5 = 659.25, G5 = 783.99, A5 = 880, B5 = 987.77
+const C6 = 1046.5, D6 = 1174.7, E6 = 1318.5, G6 = 1568
+const C7 = 2093
+
+/**
+ * 仏壇の「おりん」の音。上がったときの「チーン」。
+ *
+ * おりんは金属の椀なので、倍音が整数比ではなく非整数比 (1 : 2.7 : 5.4 …) で並ぶ。
+ * これが澄んだ金属的な響きを生む。減衰は非常に長く、各倍音を少しずつデチューンして
+ * 2本重ねると「うなり」が出て、本物のような揺れる余韻になる。
+ */
+const rin = () => {
+  const c = getCtx()
+  if (!c || !master || !enabled) return
+  const t0 = c.currentTime
+
+  // 撞木で縁を打つ瞬間の、ごく短い金属的アタック。
+  noiseBurst(c, master, 0.02, 5200, 1.4, 0.1, 30)
+
+  const fund = 1318.5 // 明るく澄んだ「チーン」(E6 あたり)
+  // 椀の非整数倍音。r=比率, g=音量, d=減衰(秒)。上の倍音ほど速く消える。
+  const partials = [
+    { r: 1, g: 0.5, d: 3.4 },
+    { r: 2.76, g: 0.26, d: 2.7 },
+    { r: 5.4, g: 0.12, d: 1.9 },
+    { r: 8.93, g: 0.05, d: 1.2 },
+  ]
+  for (const p of partials) {
+    // わずかにずらした2本でうなり (揺れる余韻) を作る。
+    for (const detune of [-1.2, 1.2]) {
+      const o = c.createOscillator()
+      o.type = 'sine'
+      o.frequency.value = fund * p.r + detune
+      const g = c.createGain()
+      g.gain.setValueAtTime(0, t0)
+      g.gain.linearRampToValueAtTime(p.g * 0.5, t0 + 0.004)
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + p.d)
+      o.connect(g).connect(master)
+      o.start(t0)
+      o.stop(t0 + p.d + 0.05)
+    }
+  }
+}
 
 export const sfx = {
   /** 打牌。 */
@@ -220,23 +260,18 @@ export const sfx = {
     chime([C6, E6, G6, C7], 0.075, 0.75, 0.19)
   },
 
-  /** ロン: 打ち込まれた側にも分かるよう、強く鋭い上昇。 */
+  /**
+   * ロン/ツモ: 和了は仏壇の「チーン」(おりん) で表す。
+   * 牌を打つ音の直後におりんを鳴らす。以前の音階の上昇 (ピロリーん) はやめた。
+   * ロンもツモも和了なので同じ音。どちらかは掛け声の文字で分かる。
+   */
   ron: () => {
     clack(1.25)
-    chord([C5, E5, G5], 0.02, 1.0, 0.12)
-    chime([G5, C6, E6, G6, C7], 0.06, 0.85, 0.2)
+    rin()
   },
-  /** ツモ: ロンより柔らかく、広がりのある上昇。 */
   tsumo: () => {
-    clack(1.25)
-    chord([F5, A5, C6], 0.02, 1.0, 0.11)
-    chime([C5, E5, G5, C6, E6, G6], 0.055, 0.8, 0.18)
-  },
-
-  /** 和了の余韻。掛け声のあとに重ねる。 */
-  win: () => {
-    chord([C6, E6, G6, C7, E7], 0.42, 1.5, 0.07)
-    chime([A6], 0.42, 1.4, 0.06)
+    clack(1.2)
+    rin()
   },
   /** 流局。下降して沈む2音。 */
   draw_game: () => {

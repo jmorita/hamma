@@ -436,6 +436,14 @@ input { cursor: text; }
 .side-bottom .tsumo-slot:not(.big), .side-top .tsumo-slot:not(.big) { width: var(--tw-sm); height: var(--th-sm); }
 /* 左右の席は牌が横倒しなので、縦横を入れ替えて確保する */
 .side-left .tsumo-slot, .side-right .tsumo-slot { width: var(--th-sm); height: var(--tw-sm); margin-top: 16px; }
+/*
+ * ツモ牌は「そのプレイヤーから見て右端」に置く。
+ * 手牌の末尾は 手前=画面右 / 上家(左席)=画面下 になり、これは各席の右端なのでそのまま。
+ * 対面(上席)・下家(右席) は席の向きが反転していて末尾が席の左端に来てしまうので、
+ * order で先頭 (= 席の右端) へ移し、離す余白も反対側に付け替える。
+ */
+.side-top .tsumo-slot { order: -1; margin-left: 0; margin-right: var(--tsumo-gap); }
+.side-right .tsumo-slot { order: -1; margin-top: 0; margin-bottom: 16px; }
 
 /* ツモ牌は本体から離れた別枠に置いてあり見て分かるので、「ツモ」の文字は出さない。 */
 
@@ -507,10 +515,33 @@ input { cursor: text; }
 .side-left .hand, .side-right .hand { display: flex; flex-direction: column; gap: 1.5px; }
 .side-left .tile.is-drawn, .side-right .tile.is-drawn { margin-left: 0; margin-top: 12px; }
 
+/*
+ * 複数の副露は「先に鳴いたものが右、あとの副露はその左」に並べる (実卓と同じ)。
+ * melds 配列は鳴いた順 (古い→新しい) なので、各席で古い方が席の右端に来るよう
+ * 主軸の向きを合わせる (メルド内の牌の並びとは逆向き = 席の右→左)。
+ *   手前(上向き)  : 席の右→左 = 画面右→左  → row-reverse
+ *   対面(下向き)  : 席の右→左 = 画面左→右  → row
+ *   上家(右向き)  : 席の右→左 = 画面下→上  → column-reverse
+ *   下家(左向き)  : 席の右→左 = 画面上→下  → column
+ */
 .melds { display: flex; gap: 6px; }
-.side-left .melds, .side-right .melds { flex-direction: column; }
+.side-bottom .melds { flex-direction: row-reverse; }
+.side-left .melds { flex-direction: column-reverse; }
+.side-right .melds { flex-direction: column; }
+/*
+ * メルド内の牌は「鳴いた人から見て左→右」に並べる (calledTileIndex は
+ * その並びの何番目を横向きにするかを返す。左=上家 / 中=対面 / 右=下家)。
+ * 画面の左右と各席の左右は席の向きぶんズレるので、席ごとに主軸の向きを合わせる:
+ *   手前(上向き)  : 席の左→右 = 画面左→右  → row
+ *   対面(下向き)  : 席の左→右 = 画面右→左  → row-reverse
+ *   上家(右向き)  : 席の左→右 = 画面上→下  → column
+ *   下家(左向き)  : 席の左→右 = 画面下→上  → column-reverse
+ * これを揃えないと、対面と下家で横向き牌が左右反転してしまう。
+ */
 .meld { display: flex; }
-.side-left .meld, .side-right .meld { flex-direction: column; }
+.side-top .meld { flex-direction: row-reverse; }
+.side-left .meld { flex-direction: column; }
+.side-right .meld { flex-direction: column-reverse; }
 /*
  * 加槓の4枚目は、横向きの牌に「重ねて」置く。並びと直交する方向へ積むので、
  * 手前/奥の席では縦積み、左右の席では横積みになる。
@@ -762,6 +793,11 @@ input { cursor: text; }
   position: absolute;
   z-index: 20;
   pointer-events: none;
+  /*
+   * 河マスの上に置くと、狭いマス幅に合わせて要素が縮み「ポ／ン」と縦に
+   * 折り返してしまう。1行に固定し、マスからはみ出しても横一列で出す。
+   */
+  white-space: nowrap;
   font-size: 46px;
   font-weight: bold;
   letter-spacing: 0.16em;
@@ -1037,7 +1073,6 @@ input { cursor: text; }
 
 .rake { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
 .rake b { color: var(--text); }
-.rake .cum { margin-left: 6px; opacity: 0.7; }
 .broke { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--hot); }
 
 .log { margin-top: 10px; color: var(--muted); font-size: 12px; }

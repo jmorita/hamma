@@ -94,7 +94,6 @@ export const App = () => {
   const [game, setGame] = useState<GameState>(() => createGame({ seatCount: 4, rules }))
   const [points, setPoints] = useState<number[]>(() => new Array(4).fill(0))
   const [chips, setChips] = useState<number[]>(() => new Array(4).fill(DEFAULT_STAKES.startingChips))
-  const [houseRake, setHouseRake] = useState(0)
   const [settled, setSettled] = useState(false)
   const [tick, force] = useReducer((x: number) => x + 1, 0)
 
@@ -107,8 +106,8 @@ export const App = () => {
     (kind: 'pon' | 'kan' | 'riichi' | 'ron' | 'tsumo', seat: Seat) => {
       const text = { pon: 'ポン', kan: 'カン', riichi: 'リーチ', ron: 'ロン', tsumo: 'ツモ' }[kind]
       setEffect({ text, dir: dirsFor(game.seatCount)[seat], kind })
+      // ロン/ツモの sfx 自体がおりん (チーン) を鳴らすので、ここで重ねない。
       sfx[kind]()
-      if (kind === 'ron' || kind === 'tsumo') sfx.win()
     },
     [game.seatCount],
   )
@@ -151,7 +150,6 @@ export const App = () => {
       setSeatCount(count)
       setPoints(new Array(count).fill(0))
       setChips(new Array(count).fill(st.startingChips))
-      setHouseRake(0)
       setSettled(false)
       setGame(createGame({ seatCount: count, rules }))
       setTab('table')
@@ -163,13 +161,12 @@ export const App = () => {
   useEffect(() => {
     if (game.phase !== 'end' || settled || !game.result) return
     const deltas = game.result.deltas
-    const { chipDeltas, rake } = settle(deltas, stakes)
+    const { chipDeltas } = settle(deltas, stakes)
     setPoints((p) => p.map((v, i) => v + deltas[i]))
     setChips((c) => c.map((v, i) => v + chipDeltas[i]))
-    setHouseRake((r) => r + rake)
     setSettled(true)
+    // 和了時のおりんは宣言(announce)の瞬間に鳴らすので、ここでは流局音だけ。
     if (game.result.winner === null) sfx.draw_game()
-    else sfx.win()
   }, [game.phase, game.result, settled, stakes])
 
   const broke = shortOfDeposit(chips, stakes)
@@ -195,6 +192,16 @@ export const App = () => {
           force()
         }, CPU_DELAY_MS)
         return () => clearTimeout(id)
+      }
+      // 他家がロンできる牌なら和了が優先 (ロン > ポン)。自分がロンできない場面で
+      // ポン/カンだけ提示しても意味が無いので、自動でパスして鳴き選択を飛ばす。
+      const someoneCanRon = game.pendingCalls.some(
+        (c) => c.seat !== HUMAN && c.options.includes('ron'),
+      )
+      if (someoneCanRon && !mc.options.includes('ron')) {
+        respondCall(game, HUMAN, 'pass')
+        force()
+        return
       }
       // 鳴きなしでもロンは取りこぼさない。
       if (noCall && !mc.options.includes('ron')) {
@@ -515,7 +522,6 @@ export const App = () => {
                     void unlockAudio()
                     setPoints(new Array(seatCount).fill(0))
                     setChips(new Array(seatCount).fill(stakes.startingChips))
-                    setHouseRake(0)
                     setBack(pickBackColor(backSetting))
                     setGame(createGame({ seatCount, rules }))
                     setSettled(false)
@@ -539,7 +545,6 @@ export const App = () => {
                 stakes={stakes}
                 chips={chips}
                 dirs={dirs}
-                houseRake={houseRake}
                 canContinue={canContinue}
                 broke={broke}
                 onNext={nextHand}
@@ -748,7 +753,7 @@ const Melds = ({
       const n = m.kind === 'pon' || stacked ? 3 : 4
       const called = calledTileIndex(m, seat, seatCount, n)
       return (
-        <span key={i} className="meld">
+        <span key={i} className="meld" data-from={m.from ?? -1} data-called={called}>
           {Array.from({ length: n }).map((_, j) => {
             // 暗槓は両端を伏せる。
             const hidden = m.kind === 'ankan' && (j === 0 || j === 3)
@@ -792,7 +797,6 @@ const Result = ({
   stakes,
   chips,
   dirs,
-  houseRake,
   canContinue,
   broke,
   onNext,
@@ -803,7 +807,6 @@ const Result = ({
   chips: number[]
   /** 席を画面のどの辺に置くか。点数授受を卓と同じ配置で見せるのに使う。 */
   dirs: Dir[]
-  houseRake: number
   canContinue: boolean
   broke: number[]
   onNext: () => void
@@ -824,14 +827,28 @@ const Result = ({
             {/* 鳴いた牌の向きは卓上と同じにする (どこから鳴いたかが分かる) */}
             <Melds melds={winner.melds} dir="bottom" seat={winner.seat} seatCount={game.seatCount} />
             <span className="concealed">
-              {[...winner.hand].sort((a, b) => a - b).map((t, i) => (
-                <Tile key={i} tile={t} small />
-              ))}
-              {r.reason === 'ron' && r.winningTile !== null && (
-                <span className="agari-tile">
-                  <Tile tile={r.winningTile} small />
-                </span>
-              )}
+              {(() => {
+                const winTile = r.winningTile
+                const hand = [...winner.hand].sort((a, b) => a - b)
+                // ツモは手牌に和了牌が含まれるので1枚だけ抜いて右端へ分ける
+                // (ロンは元々手牌に含まれない)。どちらも和了牌を右端に置く。
+                if (r.reason === 'tsumo' && winTile !== null) {
+                  const idx = hand.indexOf(winTile)
+                  if (idx >= 0) hand.splice(idx, 1)
+                }
+                return (
+                  <>
+                    {hand.map((t, i) => (
+                      <Tile key={i} tile={t} small />
+                    ))}
+                    {winTile !== null && (
+                      <span className="agari-tile">
+                        <Tile tile={winTile} small />
+                      </span>
+                    )}
+                  </>
+                )
+              })()}
             </span>
           </div>
 
@@ -924,8 +941,7 @@ const Result = ({
 
       {stakes.rate > 0 && rake > 0 && (
         <div className="rake">
-          レーキ {stakes.rakePercent}% → ハウス <b>{formatChips(rake)}W</b>
-          <span className="cum">(累計 {formatChips(houseRake)}W)</span>
+          レーキ {stakes.rakePercent}%: <b>{formatChips(rake)}W</b>
         </div>
       )}
 
