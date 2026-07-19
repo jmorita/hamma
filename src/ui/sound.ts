@@ -187,9 +187,9 @@ const chord = (notes: number[], start: number, dur: number, gain: number) => {
 
 // 音名 (Hz)
 const C4 = 261.63, G4 = 392, A4 = 440, B4 = 493.88
-const C5 = 523.25, D5 = 587.33, E5 = 659.25, G5 = 783.99, A5 = 880, B5 = 987.77
-const C6 = 1046.5, D6 = 1174.7, E6 = 1318.5, G6 = 1568
-const C7 = 2093
+const C5 = 523.25, D5 = 587.33, E5 = 659.25, F5 = 698.46, G5 = 783.99, A5 = 880, B5 = 987.77
+const C6 = 1046.5, D6 = 1174.7, E6 = 1318.5, G6 = 1568, A6 = 1760
+const C7 = 2093, E7 = 2637
 
 /**
  * 仏壇の「おりん」の音。上がったときの「チーン」。
@@ -231,53 +231,150 @@ const rin = () => {
   }
 }
 
-export const sfx = {
-  /** 打牌。 */
-  discard: () => clack(1),
-  /** ツモ (山から取る)。打牌より軽い。 */
-  draw: () => clack(0.45),
+/**
+ * 木魚 (もくぎょ) の音。「ポクッ」という中空の木の響き。SE2 の打牌音。
+ * 高い音から低い音へ落とすと、あの丸い中空感が出る。
+ */
+const mokugyo = (strength = 1) => {
+  const c = getCtx()
+  if (!c || !master || !enabled) return
+  const t0 = c.currentTime
+  // 撞木が当たる瞬間の短いアタック。
+  noiseBurst(c, master, 0.012, 2200, 1.6, 0.14 * strength, 45)
+  // 中空の胴鳴り。高→低へ落として「ポクッ」を作る。
+  const o = c.createOscillator()
+  o.type = 'sine'
+  o.frequency.setValueAtTime(430, t0)
+  o.frequency.exponentialRampToValueAtTime(250, t0 + 0.05)
+  const bp = c.createBiquadFilter()
+  bp.type = 'bandpass'
+  bp.frequency.value = 520
+  bp.Q.value = 2.2
+  const g = c.createGain()
+  g.gain.setValueAtTime(0.5 * strength, t0)
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.09)
+  o.connect(bp).connect(g).connect(master)
+  o.start(t0)
+  o.stop(t0 + 0.12)
+}
 
-  /**
-   * ポン。牌を倒す音 + 和音。
-   * 単音だと安っぽく聞こえるので、下に和音を敷いて厚みを出す。
-   */
+/**
+ * 太鼓の淵 (ふち) を叩く「カッ」。SE2 のポン・リーチ音。
+ * 皮ではなく縁を打つので、胴鳴りのない乾いた高域のクラックにする。
+ */
+const taikoRim = (strength = 1) => {
+  const c = getCtx()
+  if (!c || !master || !enabled) return
+  const t0 = c.currentTime
+  // 乾いた高域のクラック。
+  noiseBurst(c, master, 0.014, 3600, 2.2, 0.42 * strength, 50)
+  noiseBurst(c, master, 0.007, 7200, 2.6, 0.22 * strength, 65)
+  // 木の芯 (「カッ」の実体)。低域は削って湿らせない。
+  const o = c.createOscillator()
+  o.type = 'triangle'
+  o.frequency.value = 950
+  const hp = c.createBiquadFilter()
+  hp.type = 'highpass'
+  hp.frequency.value = 550
+  const g = c.createGain()
+  g.gain.setValueAtTime(0.34 * strength, t0)
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.028)
+  o.connect(hp).connect(g).connect(master)
+  o.start(t0)
+  o.stop(t0 + 0.04)
+}
+
+/** 流局。下降して沈む2音。両テーマ共通。 */
+const drawGameTones = () => {
+  const c = getCtx()
+  if (!c || !master || !enabled) return
+  tone(c, master, 392, 0, 0.32, 0.16)
+  tone(c, master, 294, 0.14, 0.42, 0.15)
+}
+
+export type SoundTheme = 'se1' | 'se2'
+
+interface Scheme {
+  discard: () => void
+  draw: () => void
+  pon: () => void
+  kan: () => void
+  riichi: () => void
+  ron: () => void
+  tsumo: () => void
+  draw_game: () => void
+}
+
+/**
+ * SE1: おりんに変える前の音。牌の音 + 和音 + 音階の上昇 (ピロリーん)。
+ * 和了は当時どおり、ロン/ツモの上昇に和了のフレーズを重ねる。
+ */
+const SE1: Scheme = {
+  discard: () => clack(1),
+  draw: () => clack(0.45),
   pon: () => {
     clack(1.1)
-    chord([A4, C5, E5], 0.03, 0.5, 0.1) // 土台の和音
-    chime([A5, E6], 0.08, 0.5, 0.17) // 上に乗る旋律
+    chord([A4, C5, E5], 0.03, 0.5, 0.1)
+    chime([A5, E6], 0.08, 0.5, 0.17)
   },
-  /** カン: ポンより厚く、1音多い。 */
   kan: () => {
     clack(1.2)
     chord([G4, B4, D5, G5], 0.03, 0.6, 0.1)
     chime([B5, D6, G6], 0.075, 0.6, 0.17)
   },
-
-  /** リーチ: 決意が伝わるよう、和音を敷いて力強く上げる。 */
   riichi: () => {
     clack(1.1)
     chord([C4, G4, C5], 0.02, 0.9, 0.11)
     chime([C6, E6, G6, C7], 0.075, 0.75, 0.19)
   },
-
-  /**
-   * ロン/ツモ: 和了は仏壇の「チーン」(おりん) で表す。
-   * 牌を打つ音の直後におりんを鳴らす。以前の音階の上昇 (ピロリーん) はやめた。
-   * ロンもツモも和了なので同じ音。どちらかは掛け声の文字で分かる。
-   */
   ron: () => {
     clack(1.25)
-    rin()
+    chord([C5, E5, G5], 0.02, 1.0, 0.12)
+    chime([G5, C6, E6, G6, C7], 0.06, 0.85, 0.2)
+    chord([C6, E6, G6, C7, E7], 0.42, 1.5, 0.07)
+    chime([A6], 0.42, 1.4, 0.06)
   },
   tsumo: () => {
-    clack(1.2)
-    rin()
+    clack(1.25)
+    chord([F5, A5, C6], 0.02, 1.0, 0.11)
+    chime([C5, E5, G5, C6, E6, G6], 0.055, 0.8, 0.18)
+    chord([C6, E6, G6, C7, E7], 0.42, 1.5, 0.07)
+    chime([A6], 0.42, 1.4, 0.06)
   },
-  /** 流局。下降して沈む2音。 */
-  draw_game: () => {
-    const c = getCtx()
-    if (!c || !master || !enabled) return
-    tone(c, master, 392, 0, 0.32, 0.16)
-    tone(c, master, 294, 0.14, 0.42, 0.15)
+  draw_game: drawGameTones,
+}
+
+/** SE2: 和了=仏壇のおりん / 打牌=木魚 / ポン・カン・リーチ=太鼓の淵「カッ」。 */
+const SE2: Scheme = {
+  discard: () => mokugyo(1),
+  draw: () => mokugyo(0.5),
+  pon: () => taikoRim(1.15),
+  kan: () => {
+    taikoRim(1.2)
+    // 少し遅らせてもう1発、「カッカ」でカンらしく。
+    setTimeout(() => taikoRim(0.95), 70)
   },
+  riichi: () => taikoRim(1.1),
+  ron: () => rin(),
+  tsumo: () => rin(),
+  draw_game: drawGameTones,
+}
+
+const SCHEMES: Record<SoundTheme, Scheme> = { se1: SE1, se2: SE2 }
+let theme: SoundTheme = 'se2'
+export const setSoundTheme = (t: SoundTheme) => {
+  theme = t
+}
+export const getSoundTheme = (): SoundTheme => theme
+
+// 実際に呼ばれる効果音。選択中のテーマへ委譲する。
+export const sfx = {
+  discard: () => SCHEMES[theme].discard(),
+  draw: () => SCHEMES[theme].draw(),
+  pon: () => SCHEMES[theme].pon(),
+  kan: () => SCHEMES[theme].kan(),
+  riichi: () => SCHEMES[theme].riichi(),
+  ron: () => SCHEMES[theme].ron(),
+  tsumo: () => SCHEMES[theme].tsumo(),
+  draw_game: () => SCHEMES[theme].draw_game(),
 }

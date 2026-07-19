@@ -19,7 +19,7 @@ import { tileName, type Tile as TileId } from '../core/tiles'
 import { cpuTurnAction, cpuCallResponse } from '../ai/cpu'
 import { Tile, type Dir } from './Tile'
 import { RulesPanel } from './RulesPanel'
-import { sfx, setSoundEnabled, unlockAudio } from './sound'
+import { sfx, setSoundEnabled, setSoundTheme, unlockAudio, type SoundTheme } from './sound'
 import { BACK_COLORS, pickBackColor, type BackColor, type BackColorSetting } from './backColor'
 import { isFullscreen, onFullscreenChange, supportsFullscreen, toggleFullscreen } from './fullscreen'
 import { enableToolbarShrink, onFirstScroll, shouldShrinkToolbar } from './toolbarShrink'
@@ -50,6 +50,7 @@ export const App = () => {
   /** リーチ後の自動ツモ切り: 和了牌でもカンでもなければ自動で切る。 */
   const [autoTsumogiri, setAutoTsumogiri] = useState(false)
   const [sound, setSound] = useState(true)
+  const [soundTheme, setTheme] = useState<SoundTheme>('se2')
   /** デバッグモード: 他家の手牌を開ける。j を素早く2回で切替。 */
   const [debug, setDebug] = useState(false)
   /** ポン/リーチ/ロン/ツモ の演出。表示中は進行を止める。 */
@@ -108,8 +109,12 @@ export const App = () => {
     (kind: 'pon' | 'kan' | 'riichi' | 'ron' | 'tsumo', seat: Seat) => {
       const text = { pon: 'ポン', kan: 'カン', riichi: 'リーチ', ron: 'ロン', tsumo: 'ツモ' }[kind]
       setEffect({ text, dir: dirsFor(game.seatCount)[seat], kind })
-      // ロン/ツモの sfx 自体がおりん (チーン) を鳴らすので、ここで重ねない。
-      sfx[kind]()
+      if (kind === 'ron' || kind === 'tsumo') {
+        // 和了音は1.0秒おいてから鳴らす (掛け声のあとに一拍おく)。
+        setTimeout(() => sfx[kind](), 1000)
+      } else {
+        sfx[kind]()
+      }
     },
     [game.seatCount],
   )
@@ -122,6 +127,7 @@ export const App = () => {
   }, [effect])
 
   useEffect(() => setSoundEnabled(sound), [sound])
+  useEffect(() => setSoundTheme(soundTheme), [soundTheme])
 
   // 手番や局が変わったら確認待ちを解除する。
   // 残っていると次の手番の1タップ目でいきなり切れてしまう。
@@ -439,6 +445,8 @@ export const App = () => {
                     }}
                     sound={sound}
                     onSound={setSound}
+                    soundTheme={soundTheme}
+                    onSoundTheme={setTheme}
                     backSetting={backSetting}
                     onBackSetting={(v) => {
                       setBackSetting(v)
@@ -984,6 +992,8 @@ const SettingsPanel = ({
   onConfirmTap,
   sound,
   onSound,
+  soundTheme,
+  onSoundTheme,
   backSetting,
   onBackSetting,
   onApply,
@@ -995,6 +1005,8 @@ const SettingsPanel = ({
   onConfirmTap: (v: boolean) => void
   sound: boolean
   onSound: (v: boolean) => void
+  soundTheme: SoundTheme
+  onSoundTheme: (v: SoundTheme) => void
   backSetting: BackColorSetting
   onBackSetting: (v: BackColorSetting) => void
   onApply: (count: number, st: StakeSettings) => void
@@ -1035,6 +1047,16 @@ const SettingsPanel = ({
         <button className={sound ? 'on' : ''} onClick={() => onSound(true)}>あり</button>
         <button className={!sound ? 'on' : ''} onClick={() => onSound(false)}>なし</button>
       </div>
+      {sound && (
+        <div className="seg">
+          <button className={soundTheme === 'se1' ? 'on' : ''} onClick={() => onSoundTheme('se1')}>
+            SE1
+          </button>
+          <button className={soundTheme === 'se2' ? 'on' : ''} onClick={() => onSoundTheme('se2')}>
+            SE2
+          </button>
+        </div>
+      )}
 
       {touch && (
         <>
