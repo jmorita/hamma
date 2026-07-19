@@ -187,9 +187,9 @@ const chord = (notes: number[], start: number, dur: number, gain: number) => {
 
 // 音名 (Hz)
 const C4 = 261.63, G4 = 392, A4 = 440, B4 = 493.88
-const C5 = 523.25, D5 = 587.33, E5 = 659.25, F5 = 698.46, G5 = 783.99, A5 = 880, B5 = 987.77
-const C6 = 1046.5, D6 = 1174.7, E6 = 1318.5, G6 = 1568, A6 = 1760
-const C7 = 2093, E7 = 2637
+const C5 = 523.25, D5 = 587.33, E5 = 659.25, G5 = 783.99, A5 = 880, B5 = 987.77
+const C6 = 1046.5, D6 = 1174.7, E6 = 1318.5, G6 = 1568
+const C7 = 2093
 
 /**
  * 仏壇の「おりん」の音。上がったときの「チーン」。
@@ -204,7 +204,7 @@ const rin = () => {
   const t0 = c.currentTime
 
   // 撞木で縁を打つ瞬間の、ごく短い金属的アタック。
-  noiseBurst(c, master, 0.02, 5200, 1.4, 0.1, 30)
+  noiseBurst(c, master, 0.02, 5200, 1.4, 0.085, 30)
 
   const fund = 1318.5 // 明るく澄んだ「チーン」(E6 あたり)
   // 椀の非整数倍音。r=比率, g=音量, d=減衰(秒)。上の倍音ほど速く消える。
@@ -222,7 +222,7 @@ const rin = () => {
       o.frequency.value = fund * p.r + detune
       const g = c.createGain()
       g.gain.setValueAtTime(0, t0)
-      g.gain.linearRampToValueAtTime(p.g * 0.5, t0 + 0.004)
+      g.gain.linearRampToValueAtTime(p.g * 0.43, t0 + 0.004)
       g.gain.exponentialRampToValueAtTime(0.0001, t0 + p.d)
       o.connect(g).connect(master)
       o.start(t0)
@@ -284,7 +284,71 @@ const taikoRim = (strength = 1) => {
   o.stop(t0 + 0.04)
 }
 
-/** 流局。下降して沈む2音。両テーマ共通。 */
+/**
+ * 「ズシャッ」という擦過音。SE2 の鳴き/リーチ音。
+ * ノイズをバンドパスで高→低へ掃引すると、勢いのある擦れた「ズシャッ」になる。
+ */
+const zusha = (strength = 1) => {
+  const c = getCtx()
+  if (!c || !master || !enabled) return
+  const t0 = c.currentTime
+  const dur = 0.17
+  const len = Math.max(1, Math.floor(c.sampleRate * dur))
+  const buf = c.createBuffer(1, len, c.sampleRate)
+  const d = buf.getChannelData(0)
+  for (let i = 0; i < len; i++) {
+    const t = i / len
+    d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 1.1)
+  }
+  const src = c.createBufferSource()
+  src.buffer = buf
+  const bp = c.createBiquadFilter()
+  bp.type = 'bandpass'
+  bp.Q.value = 0.9
+  bp.frequency.setValueAtTime(4200, t0)
+  bp.frequency.exponentialRampToValueAtTime(650, t0 + dur) // 高→低の擦過
+  const g = c.createGain()
+  g.gain.setValueAtTime(0.5 * strength, t0)
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur)
+  src.connect(bp).connect(g).connect(master)
+  src.start(t0)
+  src.stop(t0 + dur + 0.02)
+}
+
+/**
+ * 「ぴろーん」という明るい上昇音。SE2 の和了音。
+ * 三角波を上へグライドさせ、上にサイン波の輝きを重ねる。
+ */
+const piroon = () => {
+  const c = getCtx()
+  if (!c || !master || !enabled) return
+  const t0 = c.currentTime
+  const o = c.createOscillator()
+  o.type = 'triangle'
+  o.frequency.setValueAtTime(520, t0)
+  o.frequency.exponentialRampToValueAtTime(1500, t0 + 0.16)
+  const g = c.createGain()
+  g.gain.setValueAtTime(0, t0)
+  g.gain.linearRampToValueAtTime(0.26, t0 + 0.02)
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.6)
+  o.connect(g).connect(master)
+  o.start(t0)
+  o.stop(t0 + 0.65)
+  // 上に乗る輝き。
+  const o2 = c.createOscillator()
+  o2.type = 'sine'
+  o2.frequency.setValueAtTime(1040, t0)
+  o2.frequency.exponentialRampToValueAtTime(3000, t0 + 0.16)
+  const g2 = c.createGain()
+  g2.gain.setValueAtTime(0, t0)
+  g2.gain.linearRampToValueAtTime(0.1, t0 + 0.02)
+  g2.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.5)
+  o2.connect(g2).connect(master)
+  o2.start(t0)
+  o2.stop(t0 + 0.55)
+}
+
+/** 流局。下降して沈む2音。全テーマ共通。 */
 const drawGameTones = () => {
   const c = getCtx()
   if (!c || !master || !enabled) return
@@ -292,7 +356,7 @@ const drawGameTones = () => {
   tone(c, master, 294, 0.14, 0.42, 0.15)
 }
 
-export type SoundTheme = 'se1' | 'se2'
+export type SoundTheme = 'se1' | 'se2' | 'se3'
 
 interface Scheme {
   discard: () => void
@@ -306,8 +370,8 @@ interface Scheme {
 }
 
 /**
- * SE1: おりんに変える前の音。牌の音 + 和音 + 音階の上昇 (ピロリーん)。
- * 和了は当時どおり、ロン/ツモの上昇に和了のフレーズを重ねる。
+ * SE1 (デフォルト): 和了は仏壇のおりん「チーン」。
+ * 打牌は標準の牌の音、鳴き/リーチは和音チャイムの、落ち着いた基本セット。
  */
 const SE1: Scheme = {
   discard: () => clack(1),
@@ -327,25 +391,25 @@ const SE1: Scheme = {
     chord([C4, G4, C5], 0.02, 0.9, 0.11)
     chime([C6, E6, G6, C7], 0.075, 0.75, 0.19)
   },
-  ron: () => {
-    clack(1.25)
-    chord([C5, E5, G5], 0.02, 1.0, 0.12)
-    chime([G5, C6, E6, G6, C7], 0.06, 0.85, 0.2)
-    chord([C6, E6, G6, C7, E7], 0.42, 1.5, 0.07)
-    chime([A6], 0.42, 1.4, 0.06)
-  },
-  tsumo: () => {
-    clack(1.25)
-    chord([F5, A5, C6], 0.02, 1.0, 0.11)
-    chime([C5, E5, G5, C6, E6, G6], 0.055, 0.8, 0.18)
-    chord([C6, E6, G6, C7, E7], 0.42, 1.5, 0.07)
-    chime([A6], 0.42, 1.4, 0.06)
-  },
+  ron: () => rin(),
+  tsumo: () => rin(),
   draw_game: drawGameTones,
 }
 
-/** SE2: 和了=仏壇のおりん / 打牌=木魚 / ポン・カン・リーチ=太鼓の淵「カッ」。 */
+/** SE2: 打牌=乾いた「カッ」/ 鳴き・リーチ=「ズシャッ」/ 和了=「ぴろーん」。 */
 const SE2: Scheme = {
+  discard: () => clack(1),
+  draw: () => clack(0.45),
+  pon: () => zusha(1.1),
+  kan: () => zusha(1.25),
+  riichi: () => zusha(1.05),
+  ron: () => piroon(),
+  tsumo: () => piroon(),
+  draw_game: drawGameTones,
+}
+
+/** SE3: 和了=仏壇のおりん / 打牌=木魚 / ポン・カン・リーチ=太鼓の淵「カッ」。 */
+const SE3: Scheme = {
   discard: () => mokugyo(1),
   draw: () => mokugyo(0.5),
   pon: () => taikoRim(1.15),
@@ -360,8 +424,8 @@ const SE2: Scheme = {
   draw_game: drawGameTones,
 }
 
-const SCHEMES: Record<SoundTheme, Scheme> = { se1: SE1, se2: SE2 }
-let theme: SoundTheme = 'se2'
+const SCHEMES: Record<SoundTheme, Scheme> = { se1: SE1, se2: SE2, se3: SE3 }
+let theme: SoundTheme = 'se1'
 export const setSoundTheme = (t: SoundTheme) => {
   theme = t
 }
